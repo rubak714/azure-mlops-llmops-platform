@@ -8,9 +8,9 @@ from src.evaluate import PROMOTION_THRESHOLD
 
 
 def is_above_threshold(f1_score):
-    # accidentally using > instead of >= means a model scoring
-    # exactly 0.85 will fail when it should pass
-    return f1_score > PROMOTION_THRESHOLD
+    # >= means a model scoring exactly 0.85 passes the threshold
+    # using > was a mistake — the boundary case should pass not fail
+    return f1_score >= PROMOTION_THRESHOLD
 
 
 def test_strong_model_passes():
