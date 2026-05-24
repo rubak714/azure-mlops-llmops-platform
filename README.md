@@ -31,6 +31,28 @@ No external files, no downloads, no storage setup needed. It loads in one line a
 - Does the model reach the minimum F1 score (0.85) needed to be saved to the registry?
 - What happens in the pipeline when a model is too weak to be promoted?
 
+## How to run locally
+
+```bash
+git clone https://github.com/rubak714/azure-mlops-llmops-platform.git
+cd azure-mlops-llmops-platform
+python -m pip install -r requirements.txt
+
+# run training -logs 4 runs to MLflow
+python src/train.py
+
+# check which run passes the threshold
+python src/evaluate.py
+
+# register the best run in the MLflow model registry
+python src/register_model.py
+
+# open the MLflow UI to see all runs
+mlflow ui
+```
+
+Then open `http://127.0.0.1:5000` in your browser. Go to the `iris-random-forest` experiment in the left sidebar to see all 4 runs with their parameters and metrics.
+
 ## Related repo
 
 [azure-data-platform-terraform](https://github.com/rubak714/azure-data-platform-terraform)
