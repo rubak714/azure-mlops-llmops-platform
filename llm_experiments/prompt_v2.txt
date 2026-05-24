@@ -1,0 +1,5 @@
+Read the text below and write a short summary. Keep it under 3 sentences and only include the most important points. Do not add anything that is not in the original text.
+
+Text: {text}
+
+Summary:
