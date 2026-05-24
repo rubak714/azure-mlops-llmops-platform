@@ -1,0 +1,5 @@
+Summarize the following text in 2-3 sentences.
+
+Text: {text}
+
+Summary:
