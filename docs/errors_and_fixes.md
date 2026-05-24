@@ -82,7 +82,7 @@ Adding empty `__init__.py` files to both folders tells Python to treat them as p
     W291 trailing whitespace
 
 **What happened:**
-The code worked fine locally but the CI pipeline ran flake8 which caught several issues — unused imports left over from an earlier version of evaluate.py, f-strings written without any placeholders, inconsistent blank lines between functions, and missing newlines at the end of files. None of these broke the logic but flake8 treats them as errors and fails the pipeline.
+The code worked fine locally but the CI pipeline ran flake8 which caught several issues - unused imports left over from an earlier version of evaluate.py, f-strings written without any placeholders, inconsistent blank lines between functions, and missing newlines at the end of files. None of these broke the logic but flake8 treats them as errors and fails the pipeline.
 
 **Fix:**
 Fixed the unused imports and f-strings manually, then used autopep8 to clean up the whitespace and formatting issues automatically:
@@ -92,5 +92,18 @@ Fixed the unused imports and f-strings manually, then used autopep8 to clean up 
 After that flake8 returned nothing and the pipeline went green.
 
 **Lesson:** Running flake8 locally before pushing would have caught all of this. Added it as a habit going forward.
+
+## 6. All training runs passed the threshold - no failure case to show
+
+**When:** After merging the first PR and reviewing what the pipeline demonstrated.
+
+**What happened:**
+All three original runs scored F1 = 1.0 on Iris because RandomForest handles this dataset easily. The threshold gate existed in the code but was never actually triggered. A pipeline that only ever passes does not prove the gate works.
+
+**Fix:**
+Added a fourth parameter combination with n_estimators=2 and max_depth=1 - intentionally too weak for even a clean dataset. This run scores well below 0.85 and would be blocked from promotion. The three original runs still pass and the best one is still selected by evaluate.py.
+
+**Lesson:**
+Testing the failure case matters as much as testing the success case. This applies to ML pipelines the same way it applies to unit tests.
 
 ---
