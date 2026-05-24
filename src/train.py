@@ -10,10 +10,11 @@ from sklearn.metrics import accuracy_score, f1_score
 # These are logged to MLflow so I can compare them side by side.
 
 EXPERIMENTS = [
-    {"n_estimators": 50,  "max_depth": 3},
+    {"n_estimators": 50, "max_depth": 3},
     {"n_estimators": 100, "max_depth": 5},
     {"n_estimators": 200, "max_depth": 10},
 ]
+
 
 def load_data():
     iris = load_iris()

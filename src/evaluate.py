@@ -1,8 +1,4 @@
 import mlflow
-from sklearn.datasets import load_iris
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, f1_score
 
 # This script checks whether the best run from the experiment
 # meets the minimum F1 score needed to be promoted to the registry.
@@ -19,7 +15,7 @@ def get_best_run(experiment_name):
     experiment = mlflow.get_experiment_by_name(experiment_name)
 
     if experiment is None:
-        print(f"Experiment '{experiment_name}' not found.")
+        print("Experiment not found: " + experiment_name)
         print("Run train.py first to create the experiment.")
         return None
 
@@ -47,20 +43,20 @@ def evaluate_best_run():
     n_estimators = best_run["params.n_estimators"]
     max_depth = best_run["params.max_depth"]
 
-    print(f"\nBest run found:")
-    print(f"  run_id      : {run_id}")
-    print(f"  n_estimators: {n_estimators}")
-    print(f"  max_depth   : {max_depth}")
-    print(f"  f1_score    : {f1:.3f}")
-    print(f"  threshold   : {PROMOTION_THRESHOLD}")
+    print("\nBest run found:")
+    print("  run_id      : " + str(run_id))
+    print("  n_estimators: " + str(n_estimators))
+    print("  max_depth   : " + str(max_depth))
+    print("  f1_score    : " + str(round(f1, 3)))
+    print("  threshold   : " + str(PROMOTION_THRESHOLD))
 
     if f1 >= PROMOTION_THRESHOLD:
-        print(f"\n  Result: PASSED - model meets the threshold.")
-        print(f"  This run would be promoted to the model registry.")
+        print("\n  Result: PASSED — model meets the threshold.")
+        print("  This run would be promoted to the model registry.")
     else:
-        print(f"\n  Result: FAILED - model is below the threshold.")
-        print(f"  This run would not be promoted.")
-        print(f"  Next step: try different parameters in train.py.")
+        print("\n  Result: FAILED — model is below the threshold.")
+        print("  This run would not be promoted.")
+        print("  Next step: try different parameters in train.py.")
 
 
 if __name__ == "__main__":

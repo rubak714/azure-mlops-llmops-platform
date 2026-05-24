@@ -1,10 +1,9 @@
-import pytest
 from src.evaluate import PROMOTION_THRESHOLD
 
 # These tests check the promotion threshold logic in isolation.
 # I am not testing MLflow itself - just the decision logic:
 # does a given F1 score pass or fail the threshold?
-# This is the kind of thing that can break silently without tests -
+# This is the kind of thing that can break silently without tests
 # for example if someone changes the threshold constant by accident.
 
 
