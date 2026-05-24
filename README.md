@@ -126,6 +126,36 @@ The deliberately weak run (n_estimators=2, max_depth=1) scores around F1=0.72 an
 
 See [docs/architecture.md](./docs/architecture.md) for the full design decisions behind each component.
 
+## 📸 Screenshots and diagrams
+
+### Pipeline diagram
+
+![MLOps pipeline diagram](./screenshots/mlops_pipeline_diagram.svg)
+
+### MLflow experiment runs
+
+![MLflow experiment with 3 runs](./screenshots/1-mlflow.png)
+
+### Evaluate output - threshold check
+
+![Evaluate script output showing PASSED](./screenshots/2-evaluate.png)
+
+### Model registered in MLflow registry
+
+![Model registered as iris-classifier version 1](./screenshots/3-register-model.png)
+
+### MLflow with weak model run visible
+
+![MLflow showing 4 runs including the weak one with low F1](./screenshots/4-mlflow-weak-model.png)
+
+### CI pipeline - red run caught a broken test
+
+![GitHub Actions showing failed lint-and-test job](./screenshots/5-ci-failed-run.png)
+
+### CI pipeline - green after fix
+
+![GitHub Actions showing all checks passed](./screenshots/6-ci-successful-run.png)
+
 ## 🔧 Docs and learning notes
 
 | File | What it covers |
