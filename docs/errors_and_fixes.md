@@ -106,4 +106,22 @@ Added a fourth parameter combination with n_estimators=2 and max_depth=1 - inten
 **Lesson:**
 Testing the failure case matters as much as testing the success case. This applies to ML pipelines the same way it applies to unit tests.
 
+## 7. Wrong comparison operator broke the boundary test — caught by CI
+
+**When:** While working on the ci-failure-demo branch.
+
+**What happened:**
+Changed `>=` to `>` in the `is_above_threshold` function in test_evaluate.py. This meant a model scoring exactly 0.85 would fail the threshold check when it should pass. The boundary test `test_model_exactly_at_threshold_passes` caught it immediately.
+
+**Error in CI:**
+
+    FAILED tests/test_evaluate.py::test_model_exactly_at_threshold_passes
+    assert is_above_threshold(0.85) is True
+
+**Fix:**
+Changed `>` back to `>=`. One character difference but it changes the behaviour at the boundary case which is exactly the kind of thing that is easy to miss in a code review.
+
+**Lesson:**
+This is why the boundary test at exactly 0.85 was worth writing separately. A test for 0.95 would not have caught this. The CI pipeline stopped this from reaching main.
+
 ---
