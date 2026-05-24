@@ -109,11 +109,20 @@ The deliberately weak run (n_estimators=2, max_depth=1) scores around F1=0.72 an
 
 See [docs/architecture.md](./docs/architecture.md) for the full design decisions behind each component.
 
+## Docs and learning notes
+
+| File | What it covers |
+|---|---|
+| [docs/architecture.md](./docs/architecture.md) | How the pieces connect, design decisions, and what is missing vs a production setup |
+| [docs/errors_and_fixes.md](./docs/errors_and_fixes.md) | 7 real errors hit during the build with root cause and fix for each |
+| [LLM_LEARNING.md](./LLM_LEARNING.md) | Running notes on LLM concepts — tokens, RAG, hallucination, LLMOps, Azure AI Foundry |
+| [llm_experiments/notes.md](./llm_experiments/notes.md) | What changed between prompt v1 and v2 and what I observed |
+
 ## Related repo
 
-[azure-data-platform-terraform](https://github.com/rubak714/azure-data-platform-terraform)
-- the Terraform infrastructure layer this builds on top of.
+[azure-data-platform-terraform](https://github.com/rubak714/azure-data-platform-terraform) — the infrastructure layer this builds on. Covers Terraform modules for Databricks, ADLS Gen2, Key Vault, and VNet on Azure deployed to Germany West Central with a full GitHub Actions CI/CD pipeline.
 
 ## Status
 
-Work in progress. The repo is being built incrementally.
+Core pipeline complete - training, evaluation, model registry, CI, tests, and LLM experiments. Next steps are LLM API integration and drift detection.
+
