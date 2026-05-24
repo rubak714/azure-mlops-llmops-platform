@@ -1,9 +1,27 @@
 # 🤖 Azure MLOps and LLMOps Platform
 
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Last Commit](https://img.shields.io/github/last-commit/rubak714/azure-mlops-llmops-platform)](https://github.com/rubak714/azure-mlops-llmops-platform/commits/main)
+[![Issues](https://img.shields.io/github/issues/rubak714/azure-mlops-llmops-platform)](https://github.com/rubak714/azure-mlops-llmops-platform/issues)
 ![CI](https://github.com/rubak714/azure-mlops-llmops-platform/actions/workflows/code-quality.yml/badge.svg)
 ![Train](https://github.com/rubak714/azure-mlops-llmops-platform/actions/workflows/train-evaluate.yml/badge.svg)
 
+---
+
+> Most MLOps tutorials show you how to log a metric with MLflow and call it a pipeline.
+> This one is different.
+> Every design decision is documented. Every real error that came up is written down with the fix.
+> The CI pipeline went red on the first run and the fix is in the commit history.
+> This is not a walkthrough of what MLflow can do.
+> This is what actually happened when building **a real MLOps pipeline** from scratch as someone learning it for the first time.
+
+---
+
 I have been working with Terraform since last year through assigned company tasks covering GCP, Kubernetes, and Helm. More recently I built a full Azure data platform from scratch using Databricks, Key Vault, and ADLS Gen2. I also have an ML background from my thesis on missing data imputation using GANs, VAEs, DAEs, and statistical methods on DHS health survey data, plus supervised learning from university research and coursework.
+
+**This repo is the next step:** taking what I know about infrastructure and ML and learning how to operationalize models and LLMs properly on Azure. The focus is MLflow experiment tracking, a threshold-based model promotion pipeline, GitHub Actions CI, and my first hands-on work with LLMOps patterns.
+
+I am documenting what I learn as I go, including a dedicated [LLM_LEARNING.md](./LLM_LEARNING.md) for the LLM concepts that are new to me.
 
 **This repo is the next step:** taking what I know about infrastructure and ML and learning how to operationalize models and LLMs properly on Azure. The focus is MLflow experiment tracking, a threshold-based model promotion pipeline, GitHub Actions CI, and my first hands-on work with LLMOps patterns.
 
