@@ -53,6 +53,35 @@ mlflow ui
 
 Then open `http://127.0.0.1:5000` in your browser. Go to the `iris-random-forest` experiment in the left sidebar to see all 4 runs with their parameters and metrics.
 
+## Project structure
+
+```
+azure-mlops-llmops-platform/
+├── .github/
+│   └── workflows/
+│       ├── code-quality.yml       # flake8 and pytest on every PR
+│       └── train-evaluate.yml     # training and evaluation on merge to main
+├── src/
+│   ├── train.py                   # trains the model and logs runs to MLflow
+│   ├── evaluate.py                # checks the best run against the threshold
+│   └── register_model.py          # registers the model if it passes
+├── tests/
+│   ├── test_evaluate.py           # threshold logic and boundary cases
+│   └── test_data_loading.py       # data split and shape checks
+├── llm_experiments/
+│   ├── prompt_v1.txt              # first prompt version
+│   ├── prompt_v2.txt              # revised prompt with tighter constraints
+│   └── notes.md                   # what changed between versions
+├── notebooks/
+│   └── ml_exploration.ipynb       # dataset exploration before writing train.py
+├── docs/
+│   ├── architecture.md            # how the pieces connect and why
+│   └── errors_and_fixes.md        # 7 real errors hit during the build
+├── screenshots/                   # MLflow UI, CI runs, evaluate output
+├── LLM_LEARNING.md                # running notes on LLM concepts new to me
+└── requirements.txt
+```
+
 ## Related repo
 
 [azure-data-platform-terraform](https://github.com/rubak714/azure-data-platform-terraform)
