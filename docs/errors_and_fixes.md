@@ -69,4 +69,28 @@ pytest could not find the `src` folder because there was no `__init__.py` file i
 
 Adding empty `__init__.py` files to both folders tells Python to treat them as packages and the imports worked after that.
 
+## 5. flake8 failed on the first CI run with multiple errors
+
+**When:** After pushing the GitHub Actions workflow and watching the first run in the Actions tab.
+
+**Errors:**
+    F401 imported but unused
+    F541 f-string is missing placeholders
+    E302 expected 2 blank lines, found 1
+    W292 no newline at end of file
+    W293 blank line contains whitespace
+    W291 trailing whitespace
+
+**What happened:**
+The code worked fine locally but the CI pipeline ran flake8 which caught several issues — unused imports left over from an earlier version of evaluate.py, f-strings written without any placeholders, inconsistent blank lines between functions, and missing newlines at the end of files. None of these broke the logic but flake8 treats them as errors and fails the pipeline.
+
+**Fix:**
+Fixed the unused imports and f-strings manually, then used autopep8 to clean up the whitespace and formatting issues automatically:
+
+    autopep8 --in-place --aggressive src/evaluate.py src/register_model.py src/train.py tests/test_evaluate.py tests/test_data_loading.py
+
+After that flake8 returned nothing and the pipeline went green.
+
+**Lesson:** Running flake8 locally before pushing would have caught all of this. Added it as a habit going forward.
+
 ---
