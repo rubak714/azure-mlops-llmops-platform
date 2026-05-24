@@ -82,6 +82,33 @@ azure-mlops-llmops-platform/
 └── requirements.txt
 ```
 
+## How the pipeline works
+
+    src/train.py
+        trains RandomForestClassifier across 4 parameter combinations
+        logs parameters, accuracy, F1 score, and model artifact to MLflow
+            |
+            v
+    src/evaluate.py
+        finds the best run by F1 score in the iris-random-forest experiment
+        checks whether it meets the promotion threshold of 0.85
+        prints PASSED or FAILED with the run details
+            |
+            v
+    src/register_model.py
+        runs the same threshold check
+        if F1 >= 0.85 → registers the model in the MLflow registry
+        if F1 < 0.85  → exits without registering anything
+            |
+            v
+    .github/workflows/train-evaluate.yml
+        runs train.py and evaluate.py automatically on every merge to main
+        so any change that affects model performance is visible immediately
+
+The deliberately weak run (n_estimators=2, max_depth=1) scores around F1=0.72 and demonstrates the gate blocking a bad model. The three stronger runs all score F1=1.0 on this dataset and pass.
+
+See [docs/architecture.md](./docs/architecture.md) for the full design decisions behind each component.
+
 ## Related repo
 
 [azure-data-platform-terraform](https://github.com/rubak714/azure-data-platform-terraform)
