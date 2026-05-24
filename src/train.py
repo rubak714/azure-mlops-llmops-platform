@@ -13,6 +13,10 @@ EXPERIMENTS = [
     {"n_estimators": 50, "max_depth": 3},
     {"n_estimators": 100, "max_depth": 5},
     {"n_estimators": 200, "max_depth": 10},
+    # deliberately weak settings to test the threshold gate
+    # n_estimators=2 and max_depth=1 is too weak for even a clean
+    # dataset — added to show what a failed promotion looks like
+    {"n_estimators": 2, "max_depth": 1},
 ]
 
 
