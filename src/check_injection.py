@@ -5,7 +5,12 @@ import sys
 import mlflow
 
 from src.llm_client import complete, describe_provider, extract_source_text
-from src.prompt_registry import EXPERIMENTS_DIR, list_versions, render_prompt
+from src.prompt_registry import (
+    EXPERIMENTS_DIR,
+    escape_for_prompt,
+    list_versions,
+    render_prompt,
+)
 
 # Does a prompt format keep the instructions and the data separate?
 #
@@ -55,11 +60,19 @@ def load_injection_tests():
 def boundary_held(version, hostile_text):
     # Render the prompt around the hostile text, then recover the input
     # from the rendered prompt the way the stub provider does, and check
-    # it came back unchanged.
+    # that nothing was lost.
+    #
+    # The comparison is against the ESCAPED input rather than the raw
+    # input, because render_prompt escapes delimiters on the way in. That
+    # is the fix, not a failure - "</text>" arriving as "&lt;/text&gt;"
+    # means every word survived and the structure was neutralised. What
+    # this still catches, which is the whole point, is truncation: if the
+    # prompt format cut the document short, the recovered text is missing
+    # content and this returns False.
     rendered = render_prompt(version, hostile_text)
     recovered = extract_source_text(rendered)
 
-    return recovered.strip() == hostile_text.strip()
+    return recovered.strip() == escape_for_prompt(hostile_text).strip()
 
 
 def canary_leaked(version, hostile_text, canary):
@@ -175,12 +188,15 @@ def print_summary(all_results):
 
     if fully_resistant:
         print("\n  Fully resistant: " + ", ".join(fully_resistant))
+        print("\n  render_prompt escapes the delimiter out of the input, so a")
+        print("  pasted <text> or </text> arrives as inert characters with")
+        print("  every word intact. The versions still breaking use natural")
+        print("  language as structure - 'Summary:' cannot be escaped without")
+        print("  corrupting any document that legitimately contains the word.")
+        print("  Delimiters did not prevent the problem; they made it")
+        print("  preventable, and only the delimited formats could be fixed.")
     else:
         print("\n  No prompt version keeps every input intact.")
-        print("  The two formats fail on opposite attacks - the undelimited")
-        print("  one on text containing its output label, the delimited one")
-        print("  on text containing its closing tag. Adding delimiters traded")
-        print("  one vulnerability for another rather than removing it.")
 
     return fully_resistant
 

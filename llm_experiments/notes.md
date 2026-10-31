@@ -58,6 +58,18 @@ v4 is the better prompt - it has a role, a tighter limit, an explicit preamble b
 
 That limitation is written up properly in [docs/prompt_engineering.md](../docs/prompt_engineering.md). The short version: these scores measure how precisely a prompt states its requirements, which is a real property of a prompt and is not the same thing as output quality. Separating v3 from v4 needs a real model and harder inputs.
 
+## The thing the scores never showed
+
+The composite ranks v3 and v4 top and v1 and v2 below the gate. That turned out not to be the most important difference between them.
+
+Testing whether each prompt format keeps the instructions and the data apart (`python -m src.check_injection`) found that v1 and v2 silently truncate their input whenever the text contains the word `Summary:`. Everything after it is never summarized, and the output is a fluent summary of the surviving half with nothing to indicate anything went missing. That needs no attacker - minutes, reports with section headings and forwarded email threads contain "Summary:" routinely.
+
+v3 and v4 were not safe either at first. They truncate on `</text>`, their own closing tag. Adding delimiters had traded one vulnerability for another.
+
+`render_prompt` now escapes delimiters out of the input before substituting them, the same way you escape quotes before building a SQL string. v3 and v4 went to 100% boundary integrity. v1 and v2 did not, and cannot - `Summary:` is ordinary English and escaping it would corrupt any document legitimately containing the word.
+
+So the real argument for the v2 to v3 change is not the 0.175 jump in composite score. It is that **v3's format can be made safe and v2's cannot.** I did not know that when I wrote v3, and I would not have found it out by looking at the scores.
+
 ## Why I am keeping every version
 
 Deleting v1 once v2 was written would lose the record of what changed and why. Keeping all four in the repo is the same idea as keeping old experiment runs in MLflow - the history is the useful part.
