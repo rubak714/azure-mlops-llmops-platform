@@ -171,15 +171,26 @@ any document containing the word `Summary:`. The two things fail
 independently, so they are measured independently.
 
 The finding is in error 13 and it changed how I think about prompt
-construction: adding `<text>` delimiters in v3 did not remove a
-vulnerability, it traded one. v1 and v2 break on text containing their
-output label; v3 and v4 break on text containing their closing tag. No
-version passes everything.
+construction. Measuring it showed that adding `<text>` delimiters in v3
+did not remove a vulnerability, it traded one - v1 and v2 broke on text
+containing their output label, v3 and v4 on text containing their closing
+tag, and no version passed everything.
 
-I left it that way rather than deleting the inconvenient test case. The
-real fix is escaping the delimiter inside `render_prompt`, which is a
-change to the rendering code rather than to any prompt, and it is listed
-as open below.
+The fix is in `render_prompt`, which escapes the delimiter out of the
+input before substituting it. It is one function and one line, and it is
+the prompt equivalent of a parameterised query: the structure comes from
+the template, never from the data.
+
+v3 and v4 now pass every case. v1 and v2 still do not, and that is the
+part worth understanding - their format uses `Summary:` as structure, and
+`Summary:` is ordinary English. Escaping it would corrupt any document
+that legitimately contains the word. There is no escaping rule that fixes
+that format, only a different format.
+
+Which is a better argument for delimiters than the one I had originally:
+**delimiters do not prevent injection, they make it preventable.** A
+structure made of characters nobody writes by accident can be escaped. A
+structure made of English cannot.
 
 ---
 
@@ -291,14 +302,18 @@ Closed since the first version of this document:
 - ~~No serving layer~~ - `serve.py` serves the promoted model over HTTP
   with validation, health reporting, and version resolution
 
+- ~~Prompt inputs are not escaped~~ - `render_prompt` escapes delimiters
+  out of the input, taking v3 and v4 to full boundary integrity. See
+  error 13 for why v1 and v2 could not be fixed the same way.
+
 Still open, honestly:
 
-- **Prompt inputs are not escaped.** This is now the most serious gap,
-  because unlike the others it is a correctness bug rather than a missing
-  feature. Every prompt version can have its input silently truncated by
-  text containing the right string, and the result is a fluent summary of
-  half a document with nothing to indicate the rest was dropped. The fix
-  is escaping the delimiter in `render_prompt`. See error 13.
+- **Injection is only solved at the parsing level.** Escaping stops a
+  pasted delimiter from truncating the input. It cannot stop a model
+  deciding to follow an instruction written in plain English inside the
+  text, because there is no delimiter there to escape. Measuring that
+  needs a real model, and it is the main thing the offline stub cannot
+  tell me.
 - **No connection to a real data source.** Iris is a stand-in on the ML
   side and eight texts I wrote myself are a stand-in on the LLM side.
 - **No live LLM endpoint.** The Azure OpenAI adapter is written and its

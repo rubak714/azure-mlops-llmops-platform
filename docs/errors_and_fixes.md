@@ -308,16 +308,50 @@ The `<text>` tags introduced a vulnerability of their own. A delimiter separates
 
 A third case breaks every version - text containing a complete `<text>...</text>` region hijacks the extractor whether or not the prompt itself uses tags.
 
-**What I did:**
-Nothing to the prompts. There is no arrangement of these four versions that passes everything, and pretending otherwise by deleting the inconvenient test case would be worse than the vulnerability.
+**First response:**
+Measure it rather than quietly reword the prompts. Built `src/check_injection.py`, added a `prompt-injection` MLflow experiment, and wrote `tests/test_check_injection.py` to pin each finding down - including `test_no_version_resists_everything`, written deliberately so that if a later change ever did fix this, the test would fail loudly instead of the claim in the docs going stale.
 
-Built `src/check_injection.py` to measure it instead, added a `prompt-injection` MLflow experiment, and wrote `tests/test_check_injection.py` to pin each finding down so that a future change to the prompt format has to acknowledge what it costs. Every version now sits at 67% boundary integrity, failing on different attacks.
+At that point every version sat at 67% boundary integrity, failing on different attacks.
 
-The real fix is to strip or escape the delimiter from input text before substituting it - the same defence as escaping quotes before building a SQL string. That is a change to `render_prompt` rather than to any prompt, and it is a genuine next step rather than something I could paper over here.
+**Fix:**
+The realisation that settled it: this is SQL injection. Same shape, same root cause - text from a user is concatenated into a structured string and nothing checks whether the text contains the structure. So it has the same fix, and the fix is not a rarer delimiter. It is escaping, applied once at the point where data meets structure.
 
-**Lesson:** I had written "delimiters make the boundary explicit but do not enforce it" in the prompt engineering doc as something I had read. Testing it turned a repeated claim into a measured one, and found a second vulnerability I had not read about anywhere.
+One function, and one line in `render_prompt`:
 
-The broader point is that this is the same class of bug as SQL injection, and it has the same shape: text from a user gets concatenated into a structured string, and nothing checks whether the text contains the structure. Prompts are string concatenation with better PR.
+    DELIMITER_TOKENS = ["<text>", "</text>"]
+
+    def escape_for_prompt(text):
+        escaped = text
+        for token in DELIMITER_TOKENS:
+            escaped = re.sub(
+                re.escape(token),
+                lambda match: match.group(0).replace("<", "&lt;").replace(">", "&gt;"),
+                escaped,
+                flags=re.IGNORECASE,
+            )
+        return escaped
+
+A pasted `</text>` now arrives as `&lt;/text&gt;` - inert to the extractor, still perfectly readable to a model and to a human. That last part is not cosmetic: a summarizer that mangles its input in order to stay safe has traded one correctness bug for another.
+
+Only the exact delimiter tokens are escaped, not every angle bracket. Escaping all of them would corrupt maths, code snippets and quoted email headers for no security benefit.
+
+**Result:**
+
+    v1   breaks on: summary-label
+    v2   breaks on: summary-label
+    v3   clean
+    v4   clean
+
+v3 and v4 went from 67% to **100%**. And `test_no_version_resists_everything` failed exactly as designed, which is how I knew to go back and rewrite the claims rather than leave them.
+
+**What is still broken, and why it stays broken:**
+v1 and v2 cannot be fixed this way. Their format uses `Summary:` as structure, and `Summary:` is ordinary English. Escaping it the way `</text>` is escaped would corrupt any document that legitimately contains the word, which is most reports, minutes and email threads. There is no escaping rule that fixes this format - only a different format.
+
+That is the conclusion I did not have when I started: **delimiters did not prevent the problem, they made it preventable.** A format whose structure is made of characters nobody writes by accident can be escaped. A format whose structure is made of English cannot. That is a narrower claim than "delimiters make the boundary explicit", and unlike that one it is a claim I measured.
+
+**Lesson:** I had written "delimiters make the boundary explicit but do not enforce it" as something I had read. Testing it turned a borrowed claim into a measured one, found a second vulnerability I had not read about anywhere, and then produced a better reason to use delimiters than the one I originally gave.
+
+Prompts are string concatenation with better PR. Treat the input the way you would treat input going into a SQL string.
 
 ---
 

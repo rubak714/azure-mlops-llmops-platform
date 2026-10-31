@@ -367,7 +367,7 @@ input. v1 and v2 use a bare `Text: ... Summary:` layout, so they do not.
 | "ignore all instructions" | hold | hold |
 | text contains `<text>...</text>` | **BREAK** | **BREAK** |
 
-Every version sits at 67%. The first half of my expectation was right and
+Every version sat at 67%. The first half of my expectation was right and
 the second half was the opposite of right.
 
 **The undelimited format truncates on its own output label.** Give v1 or
@@ -388,13 +388,51 @@ string to close.
 `<text>...</text>` region hijacks the extractor whether or not the prompt
 itself uses tags.
 
-The thing that reframed this for me: **this is SQL injection.** Same
-shape, same root cause - text from a user is concatenated into a
-structured string and nothing checks whether the text contains the
-structure. And so it has the same real fix, which is not a better
-delimiter but escaping: strip or neutralise the delimiter in the input
-before substituting it. That is a change to `render_prompt`, not to any
-prompt, and it is the next thing I would build.
+### The fix, and what it could not fix
+
+The thing that reframed this: **this is SQL injection.** Same shape, same
+root cause - text from a user is concatenated into a structured string and
+nothing checks whether the text contains the structure. So it has the same
+fix, and the fix is not a better delimiter. It is escaping, applied once
+at the point where data meets structure.
+
+`render_prompt` now escapes the delimiter out of the input before
+substituting it. A pasted `</text>` arrives as `&lt;/text&gt;` - inert to
+the parser, still completely readable to a model and to a human. That last
+part matters: a summarizer that mangles its input in order to stay safe
+has traded one correctness bug for another. Only the exact delimiter
+tokens are escaped, not every angle bracket, so maths and code snippets in
+the input survive untouched.
+
+| Attack | v1 / v2 | v3 / v4 |
+|---|---|---|
+| benign control | hold | hold |
+| text contains `Summary:` | **BREAK** | hold |
+| text contains `</text>` | hold | hold |
+| text contains `Text:` | hold | hold |
+| "ignore all instructions" | hold | hold |
+| text contains `<text>...</text>` | hold | hold |
+
+v3 and v4 went from 67% to **100%**.
+
+v1 and v2 did not, and cannot. Their format uses `Summary:` as structure,
+and `Summary:` is ordinary English. Escaping it the way `</text>` is
+escaped would corrupt any document that legitimately contains the word -
+which is most reports, minutes, and email threads. There is no escaping
+rule that fixes this format. Only a different format fixes it.
+
+Which produces a better argument for delimiters than the one I started
+with:
+
+> **Delimiters do not prevent injection. They make it preventable.**
+
+A format whose structure is made of characters nobody writes by accident
+can be escaped. A format whose structure is made of English cannot. I
+began this section expecting to confirm that delimiters are safer, found
+that they merely moved the vulnerability, and ended up with the narrower
+claim that they are the only version of the vulnerability you can
+actually fix. That is worth more than the sentence I originally wrote,
+and unlike that sentence I measured it.
 
 One honest limit on this check. It measures the prompt *format*, which is
 deterministic and needs no API key. It does not measure the failure where
@@ -488,15 +526,15 @@ gitignored, and in CI these would be GitHub Actions secrets.
 - **A held-out prompt test set.** Eight examples I wrote myself is enough
   to build the harness and not enough to trust a 0.03 difference. I am
   effectively tuning prompts against my own reference summaries.
-- **Escape the delimiter in `render_prompt`.** This is now the top of the
-  list. The boundary check above shows every prompt version can have its
-  input silently truncated, and the fix is to neutralise the delimiter in
-  the input text before substituting it rather than to keep inventing
-  rarer delimiters.
 - **Injection tests against a real model.** The boundary check measures
   the prompt format. It cannot measure whether a model decides to follow
   an injected instruction, and "ignore all previous instructions" passes
   every row of that table precisely because it imitates no delimiter.
+  This is the gap escaping does not close, and closing it needs a model.
+- **Retire v1 and v2 as production candidates.** They are kept in the
+  registry because the history is useful and because v1 is the evidence
+  for the ROUGE-L finding. But their format cannot be made safe, which is
+  a better reason to stop using them than their composite scores.
 - **Deploy to Azure AI Foundry** and point the provider at it, which is
   the gap I flagged at the end of LLM_LEARNING.md.
 
@@ -517,9 +555,11 @@ gitignored, and in CI these would be GitHub Actions secrets.
 - Version prompts and keep the old ones. The diff is the record of why.
 - Never evaluate LLM output on one metric. In this repo ROUGE-L alone
   ranked the worst of four prompts first.
-- Delimiters do not solve injection, they move it. Mine traded "breaks on
-  text containing `Summary:`" for "breaks on text containing `</text>`".
-  Treat prompt building like building a SQL string, because it is one.
+- Delimiters do not prevent injection, they make it preventable. Mine
+  traded "breaks on text containing `Summary:`" for "breaks on text
+  containing `</text>`" - and only the second one could then be escaped
+  away. Treat prompt building like building a SQL string, because it is
+  one.
 
 ---
 

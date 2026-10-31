@@ -16,6 +16,7 @@
 > The CI pipeline went red on the first run and the fix is in the commit history.
 > Two of my four prompt versions fail their own promotion gate, and I left them in.
 > One of my metrics ranked my worst prompt first, and that is written up rather than quietly reweighted.
+> I tested a claim about prompts I had only read, found it was half wrong, and found a bug underneath it that was silently discarding half of every document.
 > This is not a walkthrough of what MLflow can do.
 > This is what actually happened when building **a real MLOps and LLMOps pipeline** from scratch as someone learning it for the first time.
 
@@ -55,11 +56,11 @@ Three pipelines that share the same shape on purpose - produce candidates, score
 **Across all three**
 
 - GitHub Actions CI that runs flake8 and pytest on every PR, the prompt evaluation as a gate when anything prompt-related changes, training and evaluation on every merge to main, and the drift check on a Monday morning cron
-- 163 unit tests covering threshold logic, boundary cases, scoring maths, prompt rendering, provider selection, API validation, and the no-false-alarm case for drift
+- 173 unit tests covering threshold logic, boundary cases, scoring maths, prompt rendering, provider selection, API validation, and the no-false-alarm case for drift
 - A `Makefile` and a `pre-commit` config running the same flake8 flags CI uses, so the surprise in error 5 cannot happen twice
 - 14 real errors documented in [docs/errors_and_fixes.md](./docs/errors_and_fixes.md) as they happened
 
-Two results I would point at first. **ROUGE-L on its own ranked the worst of my four prompts highest** (error 11), which is why the composite exists. And **every one of my prompt versions can have its input silently truncated** by text containing the right string - adding `<text>` delimiters did not fix that, it swapped which string triggers it (error 13).
+Two results I would point at first. **ROUGE-L on its own ranked the worst of my four prompts highest** (error 11), which is why the composite exists. And testing a claim I had only read - that delimiters separate instructions from data - showed that my prompts **silently threw away half their input** when the text contained the wrong string, that adding `<text>` tags swapped which string triggers it rather than fixing it, and that the real fix is escaping, because this is SQL injection wearing a different hat (error 13).
 
 ## 🔧 Dataset
 
@@ -146,7 +147,7 @@ Every command above has a shortcut, which exists because errors 1 and 10 were bo
 
 **Everything else**
 
-    # 163 tests, none of which make a network call
+    # 173 tests, none of which make a network call
     python -m pytest tests/ -v
 
     # open the MLflow UI to see all runs
@@ -370,13 +371,12 @@ The prompt evaluation pipeline, the drift detection, and the documentation aroun
 
 ## 🔧 Status
 
-Complete. Model training with threshold-gated registry promotion, prompt versioning with a scored promotion gate, prompt boundary checks, scheduled drift detection, and an HTTP endpoint serving the promoted model. 163 tests, flake8 clean, and 14 errors documented as they happened.
+Complete. Model training with threshold-gated registry promotion, prompt versioning with a scored promotion gate, prompt boundary checks, scheduled drift detection, and an HTTP endpoint serving the promoted model. 173 tests, flake8 clean, and 14 errors documented as they happened.
 
 Everything listed as a next step in earlier versions of this README - LLM API integration, drift detection, and a serving layer - is now done.
 
 What I would build next, in order:
 
-1. **Escape the delimiter in `render_prompt`.** This is a correctness bug rather than a missing feature, which is why it is first. Every prompt version can have its input silently truncated by text containing the right string, and the result is a fluent summary of half a document with nothing indicating the rest was dropped. The fix is escaping the input, not inventing a rarer delimiter - the same answer as for SQL injection, which this turns out to be a version of. See error 13.
-2. **Deploy the serving layer.** It runs locally under uvicorn. No container image, no Azure Container Apps or AKS deployment, no authentication, no rate limiting. The API contract is real; the hosting is not.
-3. **A live Azure OpenAI deployment**, and then re-running the prompt comparison against a real model to find out how much the offline numbers were worth.
-4. **Wiring drift to retraining.** Easy to do and I am not convinced it is right - retraining automatically on drifted data can make a model worse, and the alert is really asking a human to look at why the inputs moved.
+1. **Deploy the serving layer.** It runs locally under uvicorn. No container image, no Azure Container Apps or AKS deployment, no authentication, no rate limiting. The API contract is real; the hosting is not.
+2. **A live Azure OpenAI deployment**, and then re-running the prompt comparison against a real model to find out how much the offline numbers were worth. It would also close the one injection gap escaping cannot: a model choosing to follow an instruction written in plain English, where there is no delimiter to escape.
+3. **Wiring drift to retraining.** Easy to do and I am not convinced it is right - retraining automatically on drifted data can make a model worse, and the alert is really asking a human to look at why the inputs moved.
