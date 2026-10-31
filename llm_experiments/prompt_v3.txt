@@ -1,0 +1,15 @@
+Summarize the text between the <text> tags in under 4 sentences. Use only information that appears in the text.
+
+Here is an example of the length and style I want.
+
+<text>
+The library extended its opening hours over the summer. It now closes at 9pm on weekdays instead of 6pm. The change followed a survey in which students asked for more evening study time.
+</text>
+Summary: The library extended its weekday opening hours from 6pm to 9pm over the summer. The change followed a student survey asking for more evening study time.
+
+Now summarize this text.
+
+<text>
+{text}
+</text>
+Summary:

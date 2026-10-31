@@ -1,0 +1,34 @@
+{
+  "task": "text-summarization",
+  "description": "Versioned prompts for a single summarization task. This file is the prompt equivalent of the MLflow model registry - every version stays here with a record of what changed and why, so a score can always be traced back to an exact prompt.",
+  "versions": [
+    {
+      "version": "v1",
+      "file": "prompt_v1.txt",
+      "technique": "zero-shot, minimal",
+      "what_changed": "The starting point. Just the instruction, the input, and the output label. States a length range and nothing else.",
+      "created": "2026-05-25"
+    },
+    {
+      "version": "v2",
+      "file": "prompt_v2.txt",
+      "technique": "zero-shot with explicit constraints",
+      "what_changed": "Added a sentence limit, an instruction to focus on the most important points, and an explicit instruction not to add anything that is not in the original text. The last one targets hallucination directly.",
+      "created": "2026-05-25"
+    },
+    {
+      "version": "v3",
+      "file": "prompt_v3.txt",
+      "technique": "few-shot with delimiters",
+      "what_changed": "Wrapped the input in <text> tags so the instructions cannot be confused with the data, and added one worked example. The example demonstrates the expected length and style instead of describing them.",
+      "created": "2026-10-31"
+    },
+    {
+      "version": "v4",
+      "file": "prompt_v4.txt",
+      "technique": "role framing, delimiters, few-shot, explicit output contract",
+      "what_changed": "Added a role for the model, tightened the limit to 2 sentences, banned the 'Here is a summary' preamble, forbade added background and opinions, and gave a fallback rule for text too short to compress. This version states what the output must look like as well as what it must contain.",
+      "created": "2026-10-31"
+    }
+  ]
+}
