@@ -1,3 +1,15 @@
+# MLflow local tracking store. Every run writes into here - params,
+# metrics, and pickled model artifacts. It is generated output, it gets
+# large, and committing it would mean every training run shows up as a
+# diff. The screenshots in screenshots/ are the record of what the runs
+# looked like.
+mlruns/
+
+# Local environment file for the Azure OpenAI credentials. The .env
+# pattern below already covers it, but calling it out here so it is
+# obvious that keys are never meant to be committed.
+.env.local
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
