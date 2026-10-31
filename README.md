@@ -28,6 +28,14 @@ I have been working with Terraform since last year through assigned company task
 
 I am documenting what I learn as I go, including a dedicated [LLM_LEARNING.md](./LLM_LEARNING.md) for the LLM concepts that are new to me.
 
+## 🧭 Start here: the interactive walkthrough
+
+**[Gate by Gate — a step-by-step tour of all three pipelines](https://claude.ai/code/artifact/62adfa9e-0181-4e32-b918-8469538c3d07)**
+
+A clickable system map with a 15-step walkthrough. Click any box to jump to what it does, or step through the whole thing with the arrow keys. It covers how the model pipeline, the prompt pipeline and the monitoring checks fit together, and why all three are built to the same shape.
+
+If you have two minutes and want to know what this repo is, start there rather than here.
+
 ## 🔧 What this builds
 
 Three pipelines that share the same shape on purpose - produce candidates, score them, gate the best one on a threshold, log everything to MLflow. That shape is the part that transfers.
@@ -316,6 +324,8 @@ See [docs/architecture.md](./docs/architecture.md) for the full design decisions
 ### Pipeline diagram
 
 ![MLOps pipeline diagram](./screenshots/mlops_pipeline_diagram.svg)
+
+This one covers the model pipeline only, which is all there was when I drew it. The interactive walkthrough linked at the top of this README covers all three.
 
 ### MLflow experiment runs
 
