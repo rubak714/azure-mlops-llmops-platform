@@ -1,0 +1,64 @@
+name: Prompt Evaluation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    # Only when something that can actually change a score has changed.
+    # Running this on a README edit would add noise to every docs PR and
+    # teach me to ignore the result.
+    paths:
+      - "llm_experiments/**"
+      - "src/llm_client.py"
+      - "src/prompt_metrics.py"
+      - "src/prompt_registry.py"
+      - "src/evaluate_prompts.py"
+      - "src/check_injection.py"
+      - ".github/workflows/prompt-eval.yml"
+  workflow_dispatch:
+
+jobs:
+  evaluate-prompts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Score every prompt version
+        # --strict makes this a gate rather than a report: the job fails
+        # if no prompt version clears the 0.70 composite threshold.
+        #
+        # This is the LLMOps equivalent of a failing test. Editing a
+        # prompt changes the system's behaviour the same way retraining
+        # does, so a prompt edit that regresses every version below the
+        # threshold should stop the merge in the same way a broken test
+        # does.
+        #
+        # No API key is needed. The evaluation runs against the offline
+        # provider by default, which is deterministic - so a score change
+        # here is always caused by the diff and never by sampling noise
+        # or by a model being updated underneath us.
+        run: python -m src.evaluate_prompts --strict
+
+      - name: Check prompt boundary integrity
+        # Deliberately not --strict. No prompt version currently keeps
+        # every hostile input intact - the undelimited format breaks on
+        # text containing its output label, the delimited one breaks on
+        # text containing its closing tag. That is a documented finding
+        # rather than a regression, so gating on it would mean a
+        # permanently red build reporting something already written down
+        # in errors_and_fixes.md.
+        #
+        # It still runs on every PR, because the numbers changing is
+        # worth seeing in the log even when it cannot fail the build.
+        run: python -m src.check_injection
