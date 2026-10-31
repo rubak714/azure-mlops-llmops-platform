@@ -125,3 +125,158 @@ Changed `>` back to `>=`. One character difference but it changes the behaviour 
 This is why the boundary test at exactly 0.85 was worth writing separately. A test for 0.95 would not have caught this. The CI pipeline stopped this from reaching main.
 
 ---
+
+## 8. flake8 reported two errors that contradicted each other
+
+**When:** Running flake8 locally before pushing the prompt evaluation code - the habit I picked up from error 5.
+
+**Error:**
+
+    src/llm_client.py:152:13: W503 line break before binary operator
+    src/prompt_registry.py:73:13: W503 line break before binary operator
+
+**What happened:**
+I moved the operators to the end of the lines instead, which is the fix W503 asks for. Then flake8 said:
+
+    src/llm_client.py:151:35: W504 line break after binary operator
+
+Same lines. The opposite complaint. W503 wants the operator *after* the line break and W504 wants it *before*, so a multi-line boolean cannot be written in any way that satisfies both. There was no arrangement of the code that would pass.
+
+The cause was in the CI command, not the code:
+
+    flake8 src/ tests/ --max-line-length=100 --ignore=E501
+
+`--ignore` **replaces** flake8's default ignore list rather than adding to it. That default list is `E121,E123,E126,E226,E24,E704,W503,W504` - it already contains both of the contradictory rules, precisely because they contradict each other. By passing `--ignore=E501` to skip line-length checks, I had silently switched W503 and W504 back on.
+
+The existing code had never hit this because none of it contained a binary operator split across lines.
+
+**Fix:**
+
+    flake8 src/ tests/ --max-line-length=100 --extend-ignore=E501
+
+`--extend-ignore` adds to the defaults instead of replacing them, so W503 and W504 stay off and E501 is also ignored.
+
+I also rewrote the affected lines to avoid multi-line binary operators altogether, using f-strings with implicit string concatenation the way `train.py` already does. That means `detect_drift.py` lints clean under either setting rather than depending on the config fix.
+
+**Lesson:** `--ignore` and `--extend-ignore` are not variations on the same flag. One of them throws away defaults that are there for a reason. If a linter ever gives two instructions that cannot both be followed, the problem is the configuration, not the code.
+
+---
+
+## 9. A test asserting `is False` failed on a value that was False
+
+**When:** Running the new drift detection tests for the first time.
+
+**Error:**
+
+    FAILED tests/test_detect_drift.py::test_ks_does_not_flag_an_identical_sample
+    assert False is False
+
+**What happened:**
+That assertion message stopped me for a while, because it reads as though `False is False` evaluated to false.
+
+The value was not Python's `False`. It was `numpy.bool_(False)`. In `ks_critical_value` I had:
+
+    return KS_CRITICAL_COEFFICIENT * np.sqrt(...)
+
+`np.sqrt` returns a `np.float64`, so the function returned a `np.float64`. The comparison in `ks_indicates_drift` then returned a `np.bool_` rather than a `bool`, because comparing against a numpy scalar gives a numpy result.
+
+`np.bool_(False) == False` is `True`. But `np.bool_(False) is False` is `False` - they are different objects. `is` checks identity, and there is only one `False` object in Python. So the test failed on a correct answer.
+
+**Fix:**
+Convert at the boundary of the module:
+
+    def ks_critical_value(n_reference, n_current):
+        return float(KS_CRITICAL_COEFFICIENT * np.sqrt(...))
+
+    def ks_indicates_drift(reference, current):
+        return bool(ks_statistic(...) > ks_critical_value(...))
+
+Every numpy value that leaves `detect_drift.py` is now converted back to a Python type. `population_stability_index` and `ks_statistic` already did this with `float()`, which is why they were fine.
+
+**Lesson:** numpy types leak. Any function that touches a numpy array returns numpy scalars by default, and they behave like Python types right up until something checks identity or writes JSON. Converting at the point where the value leaves the module is cheaper than tracking down where it got in.
+
+The deeper lesson is that this bug was only visible because the existing tests in this repo are written as `assert ... is True` rather than `assert ...`. A plain truthiness assertion would have passed and the numpy type would have stayed in the codebase until something else tripped over it.
+
+---
+
+## 10. ModuleNotFoundError: No module named 'src' - again, for a different reason
+
+**When:** Running the prompt evaluation harness the way I run every other script in this repo.
+
+**Error:**
+
+    $ python src/evaluate_prompts.py
+    Traceback (most recent call last):
+      File "src/evaluate_prompts.py", line 5, in <module>
+        from src.llm_client import (
+    ModuleNotFoundError: No module named 'src'
+
+**What happened:**
+This is the same error message as error 1 and a completely different cause, which is what made it briefly confusing. Error 1 was two Python installations. This is the import path.
+
+`train.py` runs fine as `python src/train.py` because it imports nothing from this project - only sklearn and mlflow. `evaluate_prompts.py` imports from `src.llm_client`, `src.prompt_metrics`, and `src.prompt_registry`.
+
+When you run `python path/to/file.py`, Python puts **that file's directory** on `sys.path` - so `src/` goes on the path, not the repo root. From inside `src/`, there is no package called `src`. The tests never hit this because pytest is run from the repo root, which puts the root on the path and makes `src` importable as a package.
+
+**Fix:**
+
+    python -m src.evaluate_prompts
+
+`-m` runs the module with the current directory on the path instead of the script's directory, so `src` resolves as a package. Same for the drift script: `python -m src.detect_drift`.
+
+**Lesson:** Two scripts sitting in the same folder can need different invocations, and nothing about looking at them tells you which. The deciding factor is whether a script imports from its own project.
+
+Also worth noticing: the fix is `python -m` again, which is the third time in this file that `python -m` has been the answer. Error 1 was `python -m pip`, the test command is `python -m pytest`, and now this.
+
+---
+
+## 11. ROUGE-L ranked the worst prompt first
+
+**When:** Reading the first complete output of `python -m src.evaluate_prompts` across all four prompt versions.
+
+**What happened:**
+Not a crash. A result that said the opposite of what I expected, which took longer to deal with than a crash would have.
+
+| Version | ROUGE-L | Grounding | Length | Format | Composite |
+|---|---|---|---|---|---|
+| v1 | **0.582** | 0.721 | 0.00 | 0.00 | 0.449 |
+| v2 | 0.498 | 0.834 | 1.00 | 0.00 | 0.650 |
+| v3 | 0.563 | 1.000 | 1.00 | 1.00 | 0.825 |
+| v4 | 0.563 | 1.000 | 1.00 | 1.00 | 0.825 |
+
+v1 has the highest ROUGE-L of all four versions. v1 is also the only version that invents a closing sentence that was never in the source, and the only one that ignores the length limit entirely. It is plainly the worst prompt of the four.
+
+My first thought was that ROUGE-L was implemented wrong. It is not. The reason is mechanical: v1 produces four sentences where the others produce two, and more text means more chances to overlap with the reference summary. ROUGE rewarded it for rambling. The F1 formulation already penalises padding through precision - without it v1 would have scored even higher - and it still was not enough to overcome the extra recall.
+
+**What I did:**
+Nothing to the code. This is the metric behaving correctly and measuring something narrower than I wanted it to.
+
+What it confirmed is that the composite was worth building. I had set the four weights before running this comparison, reasoning about what should matter rather than fitting them to a result, and the composite ranks the versions in the order I would rank them by hand. A single metric did not.
+
+**Lesson:** A single metric on LLM output will confidently rank a bad prompt first. This is the most useful thing I learned in the whole LLMOps half of this project, and I only learned it because v1 was still in the registry to be scored - if I had deleted it when v2 looked better, I would never have found it.
+
+It also changed how I read the phrase "we evaluate with ROUGE" in papers and blog posts.
+
+---
+
+## 12. The offline stub cannot tell v3 and v4 apart
+
+**When:** Same run as error 11.
+
+**What happened:**
+v3 and v4 score identically - 0.825, to three decimal places, on every one of the four metrics.
+
+v4 is a better prompt than v3 and I can argue it line by line: it assigns a role, tightens the limit from 3 sentences to 2, explicitly bans the "Here is a summary" preamble, forbids added background and opinions, and gives a fallback rule for input too short to compress. None of that shows up.
+
+The cause is the offline stub in `src/llm_client.py`. It is not a language model - it detects the constraints a prompt states by pattern matching and obeys them. Once a prompt has pinned length, grounding, and output format, the stub has nothing left to detect. Everything beyond that point is invisible to it, so v4's extra precision scores exactly zero extra.
+
+**What I did:**
+Left it, and wrote it down in three places - the module comment in `llm_client.py`, `docs/prompt_engineering.md`, and `llm_experiments/notes.md`.
+
+The alternative would have been to add a scoring rule that rewards something only v4 has, which would mean tuning the evaluation until it produced the ranking I had already decided on. That is backwards, and it would have made every other number in the table untrustworthy too.
+
+Separating v3 from v4 needs a real model and harder inputs - text with embedded instructions, text too short to compress, adversarial input. That is a genuine next step rather than a scoring change.
+
+**Lesson:** Know what your evaluation cannot see, and say so. A metric that returns a plausible number for every input will happily return a plausible number for a comparison it has no information about. Writing the limitation down next to the result is the only thing that stops the number being quoted later without it.
+
+---

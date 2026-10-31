@@ -1,12 +1,12 @@
 # LLM Learning Notes
 
-My background is in machine learning - missing data imputation using deep generative models (GAN, VAE, DAE, AE) and statistical methods (MICE, KNN, mean imputation) on DHS health survey data for my thesis, plus supervised learning from university research and coursework. LLMs work differently in several important ways. I am writing down what I learn here as I goo, so I can refer back to it and track how my understanding develops.
+My background is in machine learning - missing data imputation using deep generative models (GAN, VAE, DAE, AE) and statistical methods (MICE, KNN, mean imputation) on DHS health survey data for my thesis, plus supervised learning from university research and coursework. LLMs work differently in several important ways. I am writing down what I learn here as I go, so I can refer back to it and track how my understanding develops.
 
 ---
 
 ## 1. How LLMs are different from what I already know
 
-In my thesis, the task was **missing data mputation** , which included estimating missing values in tabular health survey data using generative models and statistical baselines. The methods worked with structured numeric and categorical features. I trained them, evaluated on held-out missing values, and compared RMSE or MAE and other metrics across methods.
+In my thesis, the task was **missing data imputation**, which included estimating missing values in tabular health survey data using generative models and statistical baselines. The methods worked with structured numeric and categorical features. I trained them, evaluated on held-out missing values, and compared RMSE or MAE and other metrics across methods.
 
 LLMs are different in three main ways.
 
@@ -75,21 +75,52 @@ I have not deployed to AI Foundry yet in this project. That is a next step once 
 
 ## 5. What I am experimenting with in this repo
 
-In the llm_experiments folder I am keeping two versions of a prompt for a simple text summarization task. The goal is to understand how much the output changes when I reword the prompt, and to start building the habit of treating prompts as versioned artifacts rather than throwaway text.
+This section started as "two versions of a prompt in a folder". It is now a working prompt evaluation pipeline, and the gap between those two things is most of what I actually learned.
 
-This is basic compared to a real LLMOps setup but it is a deliberate starting point - I want to understand the problem before reaching for tools that automate it.
+What is in the repo now:
+
+- Four prompt versions in `llm_experiments/`, progressing from zero-shot through explicit constraints, few-shot with delimiters, to a full output contract
+- `registry.json`, which records what changed in each version and why - the prompt equivalent of a model registry
+- Eight evaluation texts with reference summaries I wrote by hand
+- Four scoring metrics in `src/prompt_metrics.py`, combined into one composite
+- A promotion gate at composite >= 0.70, mirroring the F1 >= 0.85 gate on the ML side
+- Each prompt version logged as its own MLflow run, with the prompt text itself as the artifact
+
+I still think the instinct in the original version of this section was right - understand the problem before reaching for tools that automate it. Writing ROUGE-L out by hand taught me more about what it does and does not measure than importing it would have, and the thing I got most out of this whole project came directly from that.
+
+The write-up is in [docs/prompt_engineering.md](./docs/prompt_engineering.md).
+
+### The three things that actually changed my mind
+
+**A prompt is a specification, not an incantation.** I came in expecting prompt engineering to be about clever phrasing. It is about removing unstated assumptions. A model fills a gap in the instructions with something plausible rather than leaving it empty, so every gap I leave gets resolved for me, differently each time. One sentence - "do not add anything that is not in the original text" - moved the grounding score from 0.72 to 0.83. Nothing clever about it.
+
+**A single metric will confidently rank a bad prompt first.** I had read that evaluating LLM output is hard and I thought I understood it. I did not understand it until ROUGE-L scored my worst prompt highest of four - 0.582, above every other version - because it wrote four sentences instead of two and more text means more overlap with the reference. That is in [errors_and_fixes.md](./docs/errors_and_fixes.md) as entry 11. It is the single most useful thing I got out of this project, and it changed how I read "we evaluate with ROUGE" in a paper.
+
+**Knowing what your evaluation cannot see matters as much as the score.** My v3 and v4 prompts score identically even though v4 is clearly better. The offline simulator I built only detects constraints it can pattern match, so once a prompt pins length, grounding and format there is nothing left for it to measure. The temptation was to add a rule that would reward something only v4 has - which would be tuning the evaluation to produce a ranking I had already decided on. Writing the limitation down was the right answer and it was uncomfortable.
 
 ---
 
 ## 6. Things I do not fully understand yet
 
-- How to choose between RAG and fine-tuning for a specific use case
-- How embedding drift detection works in practice
-- How AI Foundry and Databricks are meant to work together 
-- How to evaluate LLM output at scale without it becoming expensive
+Updated from the original list, with what moved.
 
-I will update this file as I work through these.
+**Partly answered now:**
+
+- *How to evaluate LLM output at scale without it becoming expensive.* I know more about the shape of this than I did. Cheap deterministic proxies - overlap, grounding by vocabulary, format and length compliance - catch a lot and cost nothing, and they are enough to gate the obvious regressions in CI. What they cannot catch is a summary that reuses source words to say something the source never supported, and catching that needs a second model reading the output. So the realistic answer looks like a layered one: cheap metrics on every run, expensive judging on a sample or on release candidates. I have not built the second layer.
+- *How embedding drift detection works in practice.* I built distributional drift detection on tabular features in `src/detect_drift.py` - PSI and the two-sample KS test, per feature, with a threshold gate. That gave me the mechanism. Embedding drift is the same question asked of a 768-dimensional vector instead of four columns, and the part I still cannot picture is what "per feature" means when no individual dimension is interpretable. Per-dimension PSI over 768 dimensions would flag something constantly. I think the real approaches work on distances or cluster structure rather than per-dimension distributions, but I have not done it.
+
+**Still open:**
+
+- How to choose between RAG and fine-tuning for a specific use case. I understand the cost argument - retrieval is cheaper to run and far cheaper to update when documents change. What I cannot do yet is predict which one wins on quality for a given task.
+- How AI Foundry and Databricks are meant to work together. Still have not used AI Foundry at all.
+- How you decide a prompt is good enough to ship when the metric is a proxy. My 0.70 threshold has a derivation, and it is still a judgement call about a proxy measure. On the ML side F1 >= 0.85 means something concrete. I do not think there is a clean answer to this one, which is itself worth knowing.
+
+**New questions this project created:**
+
+- Prompt injection. Delimiters make the boundary between instruction and data explicit but do not enforce it. What does defence actually look like beyond "ask nicely in the prompt"?
+- How prompt versions and model versions interact. A prompt tuned against one model is not guaranteed to be better on the next one, so an upgrade can silently regress every prompt at once. My registry versions the prompt and logs the provider, which records the pairing but does nothing about it.
+- Whether drift should trigger retraining automatically. My drift check reports and alerts. Wiring it straight to `train.py` would be easy and I am not convinced it is right - retraining on drifted data can make a model worse, and the alert is asking a human to look at *why* the inputs moved.
 
 ---
 
-*Started May 2026. Updated as I learn.*
+*Started May 2026. Updated October 2026 after building the prompt evaluation and drift detection pipelines.*
