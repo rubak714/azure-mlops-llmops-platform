@@ -1,0 +1,42 @@
+name: Drift Check
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Mondays at 06:00 UTC.
+    #
+    # A schedule rather than only a push, because drift is the one thing
+    # in this project that changes without the code changing. The training
+    # and evaluation workflows run when I push because that is when the
+    # model can change. The input distribution can move while nobody
+    # touches the repo at all, so waiting for a commit to check it would
+    # mean never checking it during the quiet periods that matter most.
+    - cron: "0 6 * * 1"
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run drift detection
+        # Deliberately not --strict. The script runs four scenarios and
+        # three of them are supposed to drift - that is the demonstration,
+        # so --strict would fail this job every single time.
+        #
+        # Pointed at one real window of production data instead of the
+        # simulated scenarios, --strict is the flag that turns this from a
+        # report into a gate.
+        run: python -m src.detect_drift
