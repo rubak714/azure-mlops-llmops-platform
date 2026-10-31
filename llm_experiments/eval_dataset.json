@@ -1,0 +1,46 @@
+{
+  "description": "Hand-written evaluation set for the summarization prompts. Eight short texts, each with a reference summary I wrote myself. Same reasoning as using Iris on the ML side - no downloads, no external service, works offline, and small enough that I can read every output by eye and check whether the metric agrees with me.",
+  "target_max_sentences": 2,
+  "examples": [
+    {
+      "id": "bus-routes",
+      "text": "The city council approved funding for three new bus routes in April. The routes connect the eastern suburbs to the main train station. Construction of the new bus stops begins in July. Officials expect the routes to carry twelve thousand passengers a day.",
+      "reference": "The city council approved funding in April for three new bus routes connecting the eastern suburbs to the main train station. Bus stop construction begins in July and officials expect twelve thousand passengers a day."
+    },
+    {
+      "id": "hospital-staffing",
+      "text": "The regional hospital hired forty additional nurses this year. Waiting times in the emergency department fell from four hours to under two. The hospital funded the hires by reducing its use of agency staff. Managers said the change also lowered overall staffing costs.",
+      "reference": "The regional hospital hired forty additional nurses this year, cutting emergency department waiting times from four hours to under two. The hires were funded by reducing agency staff, which also lowered overall staffing costs."
+    },
+    {
+      "id": "solar-farm",
+      "text": "A solar farm opened on former farmland outside the town in June. It covers thirty hectares and generates enough electricity for nine thousand homes. The land was chosen because its soil quality was too poor for crops. Local residents receive a discount on their electricity bills.",
+      "reference": "A thirty hectare solar farm opened outside the town in June on former farmland with poor soil quality. It generates enough electricity for nine thousand homes and local residents receive a discount on their bills."
+    },
+    {
+      "id": "school-meals",
+      "text": "The school district replaced its packaged lunches with meals cooked on site. Food waste dropped by a third in the first term. The district reported that attendance on Fridays improved slightly. Three kitchens were refurbished to make the change possible.",
+      "reference": "The school district replaced packaged lunches with meals cooked on site after refurbishing three kitchens. Food waste fell by a third in the first term and Friday attendance improved slightly."
+    },
+    {
+      "id": "river-cleanup",
+      "text": "Volunteers removed eleven tonnes of waste from the river over two weekends. Most of the waste was plastic packaging and discarded tyres. Water quality samples taken afterwards showed a measurable improvement. The council has agreed to fund two more cleanups next year.",
+      "reference": "Volunteers removed eleven tonnes of waste, mostly plastic packaging and tyres, from the river over two weekends. Water samples showed a measurable improvement and the council agreed to fund two more cleanups next year."
+    },
+    {
+      "id": "factory-automation",
+      "text": "The packaging plant installed six robotic arms on its main production line. Output rose by eighteen percent within three months. No staff were made redundant, but twelve workers were retrained as machine operators. The plant plans to automate a second line next year.",
+      "reference": "The packaging plant installed six robotic arms on its main line, raising output by eighteen percent in three months. No staff were made redundant and twelve workers were retrained as machine operators."
+    },
+    {
+      "id": "housing-permits",
+      "text": "The city issued permits for eight hundred new homes last year. That is the highest figure in a decade. Two thirds of the permits were for apartments rather than houses. Planners attributed the increase to a simplified application process.",
+      "reference": "The city issued permits for eight hundred new homes last year, the highest figure in a decade. Two thirds were for apartments and planners credited a simplified application process."
+    },
+    {
+      "id": "station-renovation",
+      "text": "Renovation of the central train station finished two months ahead of schedule. The project added step free access to all six platforms. Passenger numbers through the station rose by seven percent after reopening. The total cost came in slightly under the approved budget.",
+      "reference": "Renovation of the central train station finished two months early and slightly under budget, adding step free access to all six platforms. Passenger numbers rose by seven percent after reopening."
+    }
+  ]
+}
