@@ -26,7 +26,15 @@ jobs:
         run: |
           # check for syntax errors and basic code issues
           # E501 is line length - ignored because it is too strict for comments
-          flake8 src/ tests/ --max-line-length=100 --ignore=E501
+          #
+          # --extend-ignore and not --ignore. This matters more than it looks:
+          # --ignore REPLACES flake8's default ignore list, which already
+          # contains W503 and W504. Those two rules contradict each other -
+          # one wants the operator before the line break, the other after -
+          # so replacing the defaults made every multi-line boolean
+          # unlintable no matter how it was written. --extend-ignore adds to
+          # the defaults instead of replacing them.
+          flake8 src/ tests/ --max-line-length=100 --extend-ignore=E501
 
       - name: Run pytest
         run: python -m pytest tests/ -v
