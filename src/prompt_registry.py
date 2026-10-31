@@ -14,8 +14,9 @@ import os
 PROMPT_PLACEHOLDER = "{text}"
 
 # Paths are resolved relative to this file, not to the working directory.
-# Doing it the other way round meant the scripts only worked when run from
-# the repo root, which broke as soon as pytest ran them from elsewhere.
+# Resolving them against the working directory would mean the registry
+# only loads when something is run from the repo root, and pytest is not
+# guaranteed to be invoked from there.
 _HERE = os.path.dirname(os.path.abspath(__file__))
 EXPERIMENTS_DIR = os.path.join(_HERE, "..", "llm_experiments")
 
@@ -80,9 +81,12 @@ def load_prompt_template(version):
 def render_prompt(version, text):
     # Substitute one input text into a prompt template.
     #
-    # Plain str.replace, not str.format - the prompts contain literal
-    # braces in places and .format() would try to interpret them. This was
-    # the first thing that broke when I wrote prompt v4.
+    # Plain str.replace, not str.format. .format() treats every brace in
+    # the template as a field to substitute, so any input text containing
+    # a brace would raise KeyError or silently swallow it. None of my
+    # evaluation texts contain braces today, but the input to a
+    # summarizer is arbitrary text and I would rather not have that be a
+    # latent crash. test_render_handles_text_containing_braces pins it.
     template = load_prompt_template(version)
     return template.replace(PROMPT_PLACEHOLDER, text)
 

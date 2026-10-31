@@ -30,9 +30,10 @@ DEFAULT_TEMPERATURE = 0.0
 DEFAULT_MAX_TOKENS = 256
 
 # Azure OpenAI reads all of its configuration from the environment so that
-# no key ever ends up in the repo. The deployment name is the name I gave
-# the model when I deployed it in Azure, not the model name itself - that
-# tripped me up the first time.
+# no key ever ends up in the repo. Worth noting that the deployment name is
+# whatever the deployment was called in Azure, not the model name - "gpt-4o"
+# is a model, "my-summarizer" might be the deployment serving it. Azure's
+# API takes the deployment.
 ENV_ENDPOINT = "AZURE_OPENAI_ENDPOINT"
 ENV_API_KEY = "AZURE_OPENAI_API_KEY"
 ENV_DEPLOYMENT = "AZURE_OPENAI_DEPLOYMENT"

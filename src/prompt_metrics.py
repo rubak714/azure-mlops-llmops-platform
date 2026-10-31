@@ -22,8 +22,14 @@ import re
 # A prompt version has to clear this to be promoted. It is lower than the
 # 0.85 F1 threshold on the ML side and that is not a mistake - text overlap
 # metrics are bounded well below 1.0 even for genuinely good summaries,
-# because there are many correct ways to word the same summary. 0.70 is
-# where my own reading of the outputs started to agree with the score.
+# because there are many correct ways to word the same summary. A prompt
+# scoring 1.0 here would mean it reproduced my reference wording exactly,
+# which is not the goal.
+#
+# 0.70 is a judgement call. The reasoning: a version that gets grounding,
+# length, and format all right scores 0.60 from those three alone, so the
+# threshold has to sit above that to mean anything - it should require
+# some genuine overlap with the reference as well, not just obedience.
 PROMPT_PROMOTION_THRESHOLD = 0.70
 
 # The weights are a judgement call, so I am writing down the reasoning.
@@ -40,7 +46,11 @@ METRIC_WEIGHTS = {
 }
 
 # Openings that mean the model started talking instead of answering.
-# Collected from actual stub and model output rather than guessed at.
+# The first four are the ones that actually show up in my runs - the stub
+# produces "Here is a summary of the text:" whenever a prompt does not pin
+# the format. The rest are the common chatty openings, included so the
+# metric does not have to be revisited the first time a real model says
+# "Certainly!" instead.
 PREAMBLE_PATTERNS = [
     r"^here is a summary",
     r"^here's a summary",

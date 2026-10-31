@@ -85,8 +85,10 @@ model lying, but the model answering a question I did not realise I had
 asked. "Do not add anything that is not in the original text" closes that
 gap explicitly.
 
-In my measurements this one instruction moved the grounding score from
-0.72 to 0.83. It is one sentence.
+In my measurements that one instruction is the difference between a
+grounding score of 0.72 and 0.83 - v1 to v2. It is one sentence of
+English. Nothing else in this document gave a bigger return for less
+effort.
 
 ### 3. Delimiters - separate the instructions from the data
 
@@ -383,12 +385,26 @@ Then `describe_provider()` reports `azure:<deployment>` instead of
 every MLflow run - so stub runs and real runs can never be silently
 compared against each other.
 
-Two things that cost me time here. `AZURE_OPENAI_DEPLOYMENT` is the name
-**I** gave the deployment in Azure, not the model name - `gpt-4o` is a
-model, `my-summarizer` might be the deployment. And `get_provider()`
-requires both the endpoint and the key before selecting Azure, so a
-half-configured environment quietly falls back to the stub instead of
-dying with an auth error.
+Note that it has to be `python -m src.evaluate_prompts` and not `python
+src/evaluate_prompts.py`. The script imports from the `src` package, and
+running a file directly puts that file's own directory on the path rather
+than the repo root, so the import fails. `python -m` from the repo root is
+the same reason `python -m pip` and `python -m pytest` are used everywhere
+else in this project - error 1 in [errors_and_fixes.md](./errors_and_fixes.md)
+is where that habit came from.
+
+Two things to watch for. `AZURE_OPENAI_DEPLOYMENT` is whatever the
+deployment was named in Azure, not the model name - `gpt-4o` is a model,
+`my-summarizer` might be the deployment serving it, and the API wants the
+deployment. And `get_provider()` requires both the endpoint and the key
+before selecting Azure, so a half-configured environment quietly falls
+back to the stub instead of dying with an auth error.
+
+I have not run this against a live deployment yet - no Azure OpenAI
+resource provisioned, for the same cost reason the Databricks workspace
+from my previous repo was destroyed after verifying it. The adapter is
+written and unit tested for its configuration and failure paths, and the
+numbers in this document all come from the stub.
 
 No key is ever read from a file in the repo. `.env` and `.env.local` are
 gitignored, and in CI these would be GitHub Actions secrets.
