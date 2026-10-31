@@ -6,6 +6,7 @@
 ![CI](https://github.com/rubak714/azure-mlops-llmops-platform/actions/workflows/code-quality.yml/badge.svg)
 ![Train](https://github.com/rubak714/azure-mlops-llmops-platform/actions/workflows/train-evaluate.yml/badge.svg)
 ![Drift](https://github.com/rubak714/azure-mlops-llmops-platform/actions/workflows/drift-check.yml/badge.svg)
+![Prompt Eval](https://github.com/rubak714/azure-mlops-llmops-platform/actions/workflows/prompt-eval.yml/badge.svg)
 
 ---
 
@@ -47,13 +48,18 @@ Three pipelines that share the same shape on purpose - produce candidates, score
 - Per-feature drift detection using PSI and the two-sample Kolmogorov-Smirnov test, both implemented in numpy rather than imported
 - A drift gate at PSI ≥ 0.25 using the conventional interpretation bands, across four scenarios: no drift, a recalibrated sensor, a class that stops appearing, and a noisier signal around an unchanged mean
 
+**Serving**
+
+- A FastAPI endpoint that loads whatever `register_model.py` promoted and answers prediction requests, with request validation, health reporting, and resolution of the registry's `latest` to a concrete version number
+
 **Across all three**
 
-- GitHub Actions CI that runs flake8 and pytest on every PR, training and evaluation on every merge to main, and the drift check on a Monday morning cron
-- 116 unit tests covering threshold logic, boundary cases, scoring maths, prompt rendering, provider selection, and the no-false-alarm case for drift
-- 12 real errors documented in [docs/errors_and_fixes.md](./docs/errors_and_fixes.md) as they happened
+- GitHub Actions CI that runs flake8 and pytest on every PR, the prompt evaluation as a gate when anything prompt-related changes, training and evaluation on every merge to main, and the drift check on a Monday morning cron
+- 163 unit tests covering threshold logic, boundary cases, scoring maths, prompt rendering, provider selection, API validation, and the no-false-alarm case for drift
+- A `Makefile` and a `pre-commit` config running the same flake8 flags CI uses, so the surprise in error 5 cannot happen twice
+- 14 real errors documented in [docs/errors_and_fixes.md](./docs/errors_and_fixes.md) as they happened
 
-The one result I would point at first: **ROUGE-L on its own ranked the worst of my four prompts highest.** That is written up as error 11, and it is why the composite exists.
+Two results I would point at first. **ROUGE-L on its own ranked the worst of my four prompts highest** (error 11), which is why the composite exists. And **every one of my prompt versions can have its input silently truncated** by text containing the right string - adding `<text>` delimiters did not fix that, it swapped which string triggers it (error 13).
 
 ## 🔧 Dataset
 
@@ -103,14 +109,44 @@ Same reasoning as using Iris. No downloads, no external service, works offline, 
     # score every prompt version and apply the promotion gate
     python -m src.evaluate_prompts
 
+    # check whether each prompt format keeps instructions and data apart
+    python -m src.check_injection
+
 **The drift check**
 
     # compare the reference window against four drift scenarios
     python -m src.detect_drift
 
+**Serving the promoted model**
+
+    # needs train.py, evaluate.py and register_model.py to have run first
+    uvicorn src.serve:app --reload
+
+Then open `http://127.0.0.1:8000/docs` for the generated API docs, or:
+
+    curl -X POST http://127.0.0.1:8000/predict \
+      -H "Content-Type: application/json" \
+      -d '{"instances": [[5.1, 3.5, 1.4, 0.2], [6.7, 3.0, 5.2, 2.3]]}'
+
+    # {"predictions":[{"class_id":0,"class_name":"setosa"},
+    #                 {"class_id":2,"class_name":"virginica"}],
+    #  "model_name":"iris-classifier","model_stage":"latest"}
+
+If nothing has been registered yet, `/predict` returns a 503 naming the commands that fix it rather than a 500, because an empty registry is a deployment state and not a bug.
+
+**Or just use the Makefile**
+
+Every command above has a shortcut, which exists because errors 1 and 10 were both invocation mistakes rather than code mistakes:
+
+    make help         # list everything
+    make ci           # lint and test, what the PR pipeline runs
+    make prompt-eval  # score the prompt versions
+    make drift        # run the drift scenarios
+    make serve        # serve the promoted model
+
 **Everything else**
 
-    # 116 tests, none of which make a network call
+    # 163 tests, none of which make a network call
     python -m pytest tests/ -v
 
     # open the MLflow UI to see all runs
@@ -133,6 +169,7 @@ Note that the newer scripts need `python -m src.evaluate_prompts` rather than `p
     │   └── workflows/
     │       ├── code-quality.yml       # flake8 and pytest on every PR
     │       ├── train-evaluate.yml     # training and evaluation on merge to main
+    │       ├── prompt-eval.yml        # prompt scoring as a gate on prompt changes
     │       └── drift-check.yml        # drift detection on a Monday cron
     ├── src/
     │   ├── train.py                   # trains the model and logs runs to MLflow
@@ -142,14 +179,18 @@ Note that the newer scripts need `python -m src.evaluate_prompts` rather than `p
     │   ├── prompt_registry.py         # loads versioned prompts and the eval set
     │   ├── prompt_metrics.py          # ROUGE-L, grounding, and compliance scoring
     │   ├── evaluate_prompts.py        # scores every prompt version, applies the gate
-    │   └── detect_drift.py            # PSI and KS drift detection per feature
+    │   ├── check_injection.py         # prompt boundary integrity against hostile input
+    │   ├── detect_drift.py            # PSI and KS drift detection per feature
+    │   └── serve.py                   # FastAPI endpoint for the promoted model
     ├── tests/
     │   ├── test_evaluate.py           # threshold logic and boundary cases
     │   ├── test_data_loading.py       # data split and shape checks
     │   ├── test_prompt_metrics.py     # scoring maths and the prompt gate
     │   ├── test_prompt_registry.py    # prompt loading and rendering
     │   ├── test_llm_client.py         # provider selection and the stub
-    │   └── test_detect_drift.py       # PSI, KS, and the no-false-alarm case
+    │   ├── test_check_injection.py    # prompt boundary findings, pinned
+    │   ├── test_detect_drift.py       # PSI, KS, and the no-false-alarm case
+    │   └── test_serve.py              # API contract, validation, caching
     ├── llm_experiments/
     │   ├── registry.json              # the prompt registry - versions and changes
     │   ├── prompt_v1.txt              # zero-shot, minimal
@@ -157,6 +198,7 @@ Note that the newer scripts need `python -m src.evaluate_prompts` rather than `p
     │   ├── prompt_v3.txt              # few-shot with delimiters
     │   ├── prompt_v4.txt              # role framing and an output contract
     │   ├── eval_dataset.json          # 8 texts with hand-written reference summaries
+    │   ├── injection_tests.json       # hostile inputs for the boundary check
     │   └── notes.md                   # what changed between versions and the scores
     ├── notebooks/
     │   └── ml_exploration.ipynb       # dataset exploration before writing train.py
@@ -166,6 +208,8 @@ Note that the newer scripts need `python -m src.evaluate_prompts` rather than `p
     │   └── errors_and_fixes.md        # 12 real errors hit during the build
     ├── screenshots/                   # MLflow UI, CI runs, evaluate output
     ├── LLM_LEARNING.md                # running notes on LLM concepts new to me
+    ├── Makefile                       # shortcuts for every command above
+    ├── .pre-commit-config.yaml        # the same flake8 flags CI uses, before pushing
     └── requirements.txt
 
 ## 🔧 How the pipeline works
@@ -302,7 +346,7 @@ See [docs/architecture.md](./docs/architecture.md) for the full design decisions
 |---|---|
 | [docs/architecture.md](./docs/architecture.md) | How the three pipelines connect, design decisions, and what is missing vs a production setup |
 | [docs/prompt_engineering.md](./docs/prompt_engineering.md) | The prompting techniques, what each one measured, and how I scored text output |
-| [docs/errors_and_fixes.md](./docs/errors_and_fixes.md) | 12 real errors hit during the build with root cause and fix for each |
+| [docs/errors_and_fixes.md](./docs/errors_and_fixes.md) | 14 real errors hit during the build with root cause and fix for each |
 | [LLM_LEARNING.md](./LLM_LEARNING.md) | Running notes on LLM concepts - tokens, RAG, hallucination, LLMOps, Azure AI Foundry |
 | [llm_experiments/notes.md](./llm_experiments/notes.md) | What changed between each prompt version and what the scores said |
 
@@ -326,13 +370,13 @@ The prompt evaluation pipeline, the drift detection, and the documentation aroun
 
 ## 🔧 Status
 
-Complete. All three pipelines are built, tested, and running in CI - model training with threshold-gated registry promotion, prompt versioning with a scored promotion gate, and scheduled drift detection. 116 tests, flake8 clean, and 12 errors documented as they happened.
+Complete. Model training with threshold-gated registry promotion, prompt versioning with a scored promotion gate, prompt boundary checks, scheduled drift detection, and an HTTP endpoint serving the promoted model. 163 tests, flake8 clean, and 14 errors documented as they happened.
 
-The two items listed as next steps in the previous version of this README - LLM API integration and drift detection - are both done.
+Everything listed as a next step in earlier versions of this README - LLM API integration, drift detection, and a serving layer - is now done.
 
 What I would build next, in order:
 
-1. **A serving layer.** The largest remaining gap. The model gets promoted to the registry and then nothing consumes it.
-2. **Prompt injection tests** in the evaluation set - input text containing embedded instructions, checking the model summarizes them rather than following them. This is where v4 should finally separate from v3.
+1. **Escape the delimiter in `render_prompt`.** This is a correctness bug rather than a missing feature, which is why it is first. Every prompt version can have its input silently truncated by text containing the right string, and the result is a fluent summary of half a document with nothing indicating the rest was dropped. The fix is escaping the input, not inventing a rarer delimiter - the same answer as for SQL injection, which this turns out to be a version of. See error 13.
+2. **Deploy the serving layer.** It runs locally under uvicorn. No container image, no Azure Container Apps or AKS deployment, no authentication, no rate limiting. The API contract is real; the hosting is not.
 3. **A live Azure OpenAI deployment**, and then re-running the prompt comparison against a real model to find out how much the offline numbers were worth.
 4. **Wiring drift to retraining.** Easy to do and I am not convinced it is right - retraining automatically on drifted data can make a model worse, and the alert is really asking a human to look at why the inputs moved.

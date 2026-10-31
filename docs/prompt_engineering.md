@@ -112,6 +112,10 @@ impossible, but they make the boundary explicit, and they let me say
 "summarize the text between the tags" rather than "summarize the following
 text", which is a meaningfully tighter instruction.
 
+I wrote that paragraph from things I had read, then built
+`src/check_injection.py` to test it. Half of it held up and the other half
+was worse than I thought - see the section on boundary integrity below.
+
 It also solved a real parsing problem on my side. The offline stub in
 `src/llm_client.py` has to find the input text inside the rendered prompt
 in order to summarize it. With `<text>` tags that is one regex. Without
@@ -338,6 +342,70 @@ Which is exactly why the Azure provider exists.
 
 ---
 
+## Boundary integrity: the part I got wrong
+
+Everything above is about getting a prompt to produce a good answer. This
+section is about something I had not thought of as a prompt property at
+all until I tested it: whether the prompt format keeps the instructions
+and the data apart.
+
+`python -m src.check_injection` renders each prompt version around a
+hostile input, then pulls the input back out of the rendered prompt and
+checks whether it survived. Six cases, including a benign control.
+
+**What I expected:** v3 and v4 use `<text>` tags, so they resist hostile
+input. v1 and v2 use a bare `Text: ... Summary:` layout, so they do not.
+
+**What actually happened:**
+
+| Attack | v1 / v2 | v3 / v4 |
+|---|---|---|
+| benign control | hold | hold |
+| text contains `Summary:` | **BREAK** | hold |
+| text contains `</text>` | hold | **BREAK** |
+| text contains `Text:` | hold | hold |
+| "ignore all instructions" | hold | hold |
+| text contains `<text>...</text>` | **BREAK** | **BREAK** |
+
+Every version sits at 67%. The first half of my expectation was right and
+the second half was the opposite of right.
+
+**The undelimited format truncates on its own output label.** Give v1 or
+v2 a document containing the word `Summary:` and the input is cut off
+there. Everything after it is never summarized. The result is a fluent,
+correct-looking summary of the half that survived, and nothing in the
+output says the other half went missing. This needs no attacker at all -
+meeting minutes, a report with section headings, a forwarded email thread
+can all contain "Summary:" by accident.
+
+**The delimited format truncates on its own closing tag.** Adding `<text>`
+tags did not remove a vulnerability, it traded one. A delimiter separates
+instructions from data only for as long as the data cannot contain the
+delimiter, and anyone who can see the prompt format knows exactly which
+string to close.
+
+**Nothing survives an injected tag pair.** Text containing a complete
+`<text>...</text>` region hijacks the extractor whether or not the prompt
+itself uses tags.
+
+The thing that reframed this for me: **this is SQL injection.** Same
+shape, same root cause - text from a user is concatenated into a
+structured string and nothing checks whether the text contains the
+structure. And so it has the same real fix, which is not a better
+delimiter but escaping: strip or neutralise the delimiter in the input
+before substituting it. That is a change to `render_prompt`, not to any
+prompt, and it is the next thing I would build.
+
+One honest limit on this check. It measures the prompt *format*, which is
+deterministic and needs no API key. It does not measure the failure where
+a model reads an injected instruction and decides to follow it - that
+depends on the model. Notice that "ignore all previous instructions" holds
+in every row above, because it imitates no delimiter and so cannot break
+any parsing. Whether it works on a real model is a question this check
+cannot answer.
+
+---
+
 ## About the offline stub, stated plainly
 
 The default provider in `src/llm_client.py` is **not a language model**.
@@ -420,9 +488,15 @@ gitignored, and in CI these would be GitHub Actions secrets.
 - **A held-out prompt test set.** Eight examples I wrote myself is enough
   to build the harness and not enough to trust a 0.03 difference. I am
   effectively tuning prompts against my own reference summaries.
-- **Prompt injection tests.** Add evaluation examples whose text contains
-  embedded instructions and check the model summarizes them instead of
-  following them. This is where v4 should finally separate from v3.
+- **Escape the delimiter in `render_prompt`.** This is now the top of the
+  list. The boundary check above shows every prompt version can have its
+  input silently truncated, and the fix is to neutralise the delimiter in
+  the input text before substituting it rather than to keep inventing
+  rarer delimiters.
+- **Injection tests against a real model.** The boundary check measures
+  the prompt format. It cannot measure whether a model decides to follow
+  an injected instruction, and "ignore all previous instructions" passes
+  every row of that table precisely because it imitates no delimiter.
 - **Deploy to Azure AI Foundry** and point the provider at it, which is
   the gap I flagged at the end of LLM_LEARNING.md.
 
@@ -443,6 +517,9 @@ gitignored, and in CI these would be GitHub Actions secrets.
 - Version prompts and keep the old ones. The diff is the record of why.
 - Never evaluate LLM output on one metric. In this repo ROUGE-L alone
   ranked the worst of four prompts first.
+- Delimiters do not solve injection, they move it. Mine traded "breaks on
+  text containing `Summary:`" for "breaks on text containing `</text>`".
+  Treat prompt building like building a SQL string, because it is one.
 
 ---
 

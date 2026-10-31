@@ -1,0 +1,49 @@
+# Runs the same checks CI runs, before the commit rather than after it.
+#
+# This exists because of error 5. The first CI run on this project went
+# red on six flake8 errors - unused imports, f-strings with no
+# placeholders, blank lines, trailing whitespace - none of which affected
+# behaviour and all of which could have been caught locally in a second.
+# The lesson I wrote down at the time was "run flake8 before pushing".
+# This is that lesson automated, because a habit I have to remember is a
+# habit I will eventually forget.
+#
+# Install once:
+#
+#     python -m pip install pre-commit
+#     pre-commit install
+#
+# After that it runs on every git commit. To check everything at once
+# without committing: pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      # The four that would have caught most of error 5 on their own.
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        # mlruns/ is gitignored, but a stray model artifact committed by
+        # accident is exactly the kind of thing that bloats a repo
+        # permanently and is awkward to remove afterwards.
+        args: ["--maxkb=1000"]
+      - id: check-merge-conflict
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        # These flags must stay identical to the ones in
+        # .github/workflows/code-quality.yml. If they drift apart this
+        # hook stops predicting whether CI will pass, which is the only
+        # thing it is for.
+        #
+        # --extend-ignore and not --ignore. See error 8 - --ignore
+        # replaces flake8's default ignore list, which already contains
+        # W503 and W504 precisely because those two rules contradict each
+        # other, and switching them back on makes multi-line booleans
+        # unlintable.
+        args: ["--max-line-length=100", "--extend-ignore=E501"]

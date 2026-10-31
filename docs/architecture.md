@@ -111,6 +111,78 @@ were not.
 
 ---
 
+## The serving layer
+
+    register_model.py
+        promotes the best run into the MLflow model registry
+            |
+            v
+    src/serve.py  (FastAPI)
+        GET  /health   is a model loadable right now
+        GET  /model    which version is answering
+        POST /predict  measurements in, class names out
+            |
+            v
+    uvicorn src.serve:app --reload
+
+This was the last gap on the list below and the one that bothered me
+most, because without it the pipeline ended with the model in storage
+rather than in use. A registry entry nothing reads is not a deployment.
+
+Three decisions in here worth recording.
+
+**The model loads lazily, not at import.** Loading at import would mean
+the module cannot be imported without a populated registry - so the tests
+could not import the app without first training and registering a model,
+and `/health` could never report that the model is missing, because the
+process would already have failed to start. Lazy loading with a
+module-level cache means the registry is read once, on the first request
+that needs it.
+
+**No model is a 503, not a 500.** Nothing is broken when the registry is
+empty; there is simply nothing promoted yet. The response says which
+commands populate it. A 500 would send someone looking for a bug that is
+not there.
+
+**"latest" is resolved to a version number.** `models:/name/latest` reads
+like a version and is not - it is a stage alias, and stages are the part
+of the MLflow registry being removed. `serve.py` queries the registry and
+builds a numeric URI instead, and `/model` reports the concrete version
+that answered. That is the more useful behaviour anyway: "latest" tells
+you nothing a week later. Written up as error 14.
+
+The tests replace the loading step rather than the registry, so the whole
+API is tested on a clean checkout with no model ever registered. What
+they test is the contract - validation, status codes, class name mapping,
+caching - because the model's accuracy is `train.py` and `evaluate.py`'s
+problem and is covered there.
+
+---
+
+## Why prompt boundaries are checked separately
+
+`src/check_injection.py` asks a question none of the scoring metrics do:
+does the prompt format keep the instructions and the data apart?
+
+It is separate from `evaluate_prompts.py` because it is not a quality
+measure. A prompt can score 0.825 on the composite and still silently
+discard half of its input - and that is exactly what v1 and v2 do with
+any document containing the word `Summary:`. The two things fail
+independently, so they are measured independently.
+
+The finding is in error 13 and it changed how I think about prompt
+construction: adding `<text>` delimiters in v3 did not remove a
+vulnerability, it traded one. v1 and v2 break on text containing their
+output label; v3 and v4 break on text containing their closing tag. No
+version passes everything.
+
+I left it that way rather than deleting the inconvenient test case. The
+real fix is escaping the delimiter inside `render_prompt`, which is a
+change to the rendering code rather than to any prompt, and it is listed
+as open below.
+
+---
+
 ## Why RandomForest and not something else
 
 I used RandomForest because I know it well from my thesis and research projects. The goal of this repo is to learn the MLflow and pipeline side of things, not to experiment with new model architectures. Using a familiar model meant I could focus on wiring up the tracking correctly without debugging model issues at the same time.
@@ -216,9 +288,17 @@ Closed since the first version of this document:
   feature on a schedule
 - ~~No LLM integration~~ - `llm_client.py` has a real Azure OpenAI
   adapter, though see the caveat below
+- ~~No serving layer~~ - `serve.py` serves the promoted model over HTTP
+  with validation, health reporting, and version resolution
 
 Still open, honestly:
 
+- **Prompt inputs are not escaped.** This is now the most serious gap,
+  because unlike the others it is a correctness bug rather than a missing
+  feature. Every prompt version can have its input silently truncated by
+  text containing the right string, and the result is a fluent summary of
+  half a document with nothing to indicate the rest was dropped. The fix
+  is escaping the delimiter in `render_prompt`. See error 13.
 - **No connection to a real data source.** Iris is a stand-in on the ML
   side and eight texts I wrote myself are a stand-in on the LLM side.
 - **No live LLM endpoint.** The Azure OpenAI adapter is written and its
@@ -226,9 +306,10 @@ Still open, honestly:
   against a provisioned deployment - no Azure OpenAI resource, for the
   same cost reason the Databricks workspace was destroyed. Every number
   in the prompt docs comes from the offline stub.
-- **No serving layer.** The registered model is not deployed behind an
-  endpoint. This is now the largest remaining gap - the model gets
-  promoted to the registry and then nothing consumes it.
+- **The serving layer is not deployed anywhere.** It runs locally under
+  uvicorn. There is no container image, no Azure Container Apps or AKS
+  deployment, no authentication, and no rate limiting. The API contract
+  is real; the hosting is not.
 - **No retraining trigger.** The drift check reports and alerts; it does
   not kick off `train.py`. Wiring drift to retraining is the obvious next
   step and is a bigger decision than it looks, because automatic
