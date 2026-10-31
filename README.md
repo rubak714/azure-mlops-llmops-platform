@@ -30,11 +30,13 @@ I am documenting what I learn as I go, including a dedicated [LLM_LEARNING.md](.
 
 ## 🧭 Start here: the interactive walkthrough
 
-**[Gate by Gate — a step-by-step tour of all three pipelines](https://claude.ai/code/artifact/62adfa9e-0181-4e32-b918-8469538c3d07)**
+**[Gate by Gate — a step-by-step tour of all three pipelines](https://rubak714.github.io/azure-mlops-llmops-platform/)**
 
 A clickable system map with a 15-step walkthrough. Click any box to jump to what it does, or step through the whole thing with the arrow keys. It covers how the model pipeline, the prompt pipeline and the monitoring checks fit together, and why all three are built to the same shape.
 
 If you have two minutes and want to know what this repo is, start there rather than here.
+
+The page is served by GitHub Pages from [docs/index.html](./docs/index.html) in this repo - one self-contained file, no build step and no external dependency except the web font.
 
 ## 🔧 What this builds
 

@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="An interactive, step-by-step walkthrough of the azure-mlops-llmops-platform repo: three pipelines, four threshold gates, and what the measurements actually said.">
+<meta property="og:title" content="Gate by Gate">
+<meta property="og:description" content="Three pipelines in one MLOps and LLMOps repo, all built to the same shape: produce candidates, score them, let a threshold decide.">
+<meta property="og:type" content="website">
+<style>
+  html { color-scheme: light dark; }
+  body { margin: 0; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+</style>
+<title>Gate by Gate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground:#EDF1F5; --surface:#FFFFFF; --surface-2:#F5F8FA; --inset:#E7EDF2;
+    --ink:#0D1620; --ink-2:#42515F; --ink-3:#6C7C8B;
+    --line:#D2DBE3; --line-2:#BCC8D2;
+    --accent:#0C6B7D; --accent-soft:#D6EBEF; --accent-line:#8FC6D0;
+    --gate:#9C5209; --gate-soft:#FAE9D2; --gate-line:#D9A86B;
+    --pass:#196B3B; --pass-soft:#DCEFE3;
+    --fail:#9E2121; --fail-soft:#F6DEDE;
+    --shadow:0 1px 2px rgba(13,22,32,.06), 0 8px 24px -12px rgba(13,22,32,.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:#0C1218; --surface:#131C25; --surface-2:#18232D; --inset:#0F171E;
+      --ink:#E3EAF1; --ink-2:#A2B1BF; --ink-3:#7A8998;
+      --line:#263440; --line-2:#33434F;
+      --accent:#49B4C8; --accent-soft:#0E2E36; --accent-line:#215E6B;
+      --gate:#E2A961; --gate-soft:#2F2411; --gate-line:#6B5226;
+      --pass:#5BC98A; --pass-soft:#12301F;
+      --fail:#EF8A8A; --fail-soft:#331717;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#0C1218; --surface:#131C25; --surface-2:#18232D; --inset:#0F171E;
+    --ink:#E3EAF1; --ink-2:#A2B1BF; --ink-3:#7A8998;
+    --line:#263440; --line-2:#33434F;
+    --accent:#49B4C8; --accent-soft:#0E2E36; --accent-line:#215E6B;
+    --gate:#E2A961; --gate-soft:#2F2411; --gate-line:#6B5226;
+    --pass:#5BC98A; --pass-soft:#12301F;
+    --fail:#EF8A8A; --fail-soft:#331717;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  /* ---------- header ---------- */
+  .masthead { display: flex; flex-wrap: wrap; gap: 20px 32px; align-items: flex-end; justify-content: space-between; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; font-weight: 500; letter-spacing: .13em; text-transform: uppercase; color: var(--accent); margin: 0 0 8px; }
+  h1 { font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-weight: 700; font-size: clamp(30px, 4.4vw, 44px); line-height: 1.04; letter-spacing: -.022em; margin: 0; text-wrap: balance; }
+  .deck { color: var(--ink-2); max-width: 54ch; margin: 12px 0 0; font-size: 16px; }
+  .repo { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.5px; color: var(--ink-2); text-decoration: none; border-bottom: 1px solid var(--line-2); padding-bottom: 1px; white-space: nowrap; }
+  .repo:hover { color: var(--accent); border-color: var(--accent); }
+
+  .stats { display: flex; flex-wrap: wrap; gap: 0; margin-top: 20px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); overflow: hidden; }
+  .stat { flex: 1 1 130px; padding: 12px 16px; border-right: 1px solid var(--line); }
+  .stat:last-child { border-right: 0; }
+  .stat b { display: block; font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 21px; font-weight: 600; line-height: 1.2; letter-spacing: -.02em; }
+  .stat span { font-size: 11.5px; color: var(--ink-3); letter-spacing: .03em; }
+
+  /* ---------- diagram ---------- */
+  .stage { margin-top: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; box-shadow: var(--shadow); overflow: hidden; }
+  .stage-head { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; padding: 11px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  .stage-title { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin: 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11.5px; color: var(--ink-3); }
+  .legend i { display: inline-block; width: 11px; height: 11px; margin-right: 5px; vertical-align: -1px; border: 1px solid var(--line-2); background: var(--surface); border-radius: 2px; }
+  .legend i.k-gate { background: var(--gate-soft); border-color: var(--gate-line); transform: skewX(-12deg); }
+  .legend i.k-store { background: var(--accent-soft); border-color: var(--accent-line); border-radius: 7px; }
+
+  .scroller { overflow-x: auto; padding: 18px 16px 10px; }
+  svg.map { display: block; width: 100%; min-width: 880px; height: auto; }
+
+  .nb rect, .nb polygon { transition: opacity .28s ease, filter .28s ease; }
+  .node, .gate, .store, .ci { cursor: pointer; }
+  .node:focus-visible, .gate:focus-visible, .store:focus-visible, .ci:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+
+  .box { fill: var(--surface-2); stroke: var(--line-2); stroke-width: 1; }
+  .box-gate { fill: var(--gate-soft); stroke: var(--gate-line); stroke-width: 1; }
+  .box-store { fill: var(--accent-soft); stroke: var(--accent-line); stroke-width: 1; }
+  .t-name { fill: var(--ink); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 500; }
+  .t-sub { fill: var(--ink-3); font-family: "IBM Plex Sans", sans-serif; font-size: 10.5px; }
+  .t-gate { fill: var(--gate); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 600; }
+  .t-gate-sub { fill: var(--gate); font-family: "IBM Plex Sans", sans-serif; font-size: 10px; opacity: .85; }
+  .t-store { fill: var(--accent); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 500; }
+  .t-store-sub { fill: var(--accent); font-family: "IBM Plex Sans", sans-serif; font-size: 10px; opacity: .8; }
+  .t-lane { fill: var(--ink-3); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; font-weight: 600; letter-spacing: .1em; }
+  .t-edge { fill: var(--ink-3); font-family: "IBM Plex Sans", sans-serif; font-size: 9.5px; }
+  .wire { stroke: var(--line-2); stroke-width: 1.4; fill: none; }
+  .wire-soft { stroke: var(--line-2); stroke-width: 1.2; fill: none; stroke-dasharray: 3 3; }
+  .mk { fill: var(--line-2); }
+  .dim { opacity: .17; }
+  .hot .box { fill: var(--surface); stroke: var(--accent); stroke-width: 1.8; }
+  .hot .box-gate { stroke: var(--gate); stroke-width: 2; }
+  .hot .box-store { stroke: var(--accent); stroke-width: 2; }
+  @media (prefers-reduced-motion: reduce) { .nb rect, .nb polygon { transition: none; } }
+
+  /* ---------- narration ---------- */
+  .console { border-top: 1px solid var(--line); background: var(--surface); }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--inset); }
+  .btn { font-family: "IBM Plex Sans", sans-serif; font-size: 13px; font-weight: 500; color: var(--ink); background: var(--surface); border: 1px solid var(--line-2); border-radius: 3px; padding: 6px 14px; cursor: pointer; }
+  .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .btn-go { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+  .btn-go:hover:not(:disabled) { color: var(--surface); filter: brightness(1.12); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ticks { display: flex; gap: 4px; margin-left: auto; }
+  .tick { width: 15px; height: 5px; border-radius: 1px; background: var(--line-2); border: 0; padding: 0; cursor: pointer; }
+  .tick[aria-current="true"] { background: var(--accent); }
+  .tick.done { background: var(--accent-line); }
+  .tick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .counter { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+  .panel { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(0,1fr); gap: 0; }
+  @media (max-width: 760px) { .panel { grid-template-columns: 1fr; } }
+  .say { padding: 20px 22px 24px; min-height: 196px; }
+  .chapter { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 7px; }
+  .say h2 { font-family: Archivo, sans-serif; font-size: 21px; font-weight: 600; letter-spacing: -.012em; margin: 0 0 9px; line-height: 1.22; text-wrap: balance; }
+  .say p { margin: 0 0 11px; color: var(--ink-2); max-width: 62ch; }
+  .say p:last-child { margin-bottom: 0; }
+  .say code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .88em; background: var(--inset); border: 1px solid var(--line); border-radius: 2px; padding: 1px 5px; color: var(--ink); }
+  .say strong { color: var(--ink); font-weight: 600; }
+  .flag { display: inline-block; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; padding: 2px 8px; border-radius: 2px; margin-bottom: 10px; }
+  .flag-find { background: var(--gate-soft); color: var(--gate); border: 1px solid var(--gate-line); }
+
+  .aside { padding: 20px 22px 24px; border-left: 1px solid var(--line); background: var(--surface-2); }
+  @media (max-width: 760px) { .aside { border-left: 0; border-top: 1px solid var(--line); } }
+  .aside h3 { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10.5px; letter-spacing: .11em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 11px; font-weight: 600; }
+  .files { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+  .files li { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); border-radius: 2px; padding: 4px 9px; overflow-wrap: anywhere; }
+  .runline { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; background: var(--inset); border: 1px solid var(--line); border-left: 2px solid var(--accent); border-radius: 2px; padding: 8px 10px; color: var(--ink); overflow-x: auto; white-space: pre; }
+  .runline b { color: var(--ink-3); font-weight: 400; }
+
+  /* ---------- findings ---------- */
+  .findings { margin-top: 40px; }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 9px; margin-bottom: 20px; }
+  .sec-head h2 { font-family: Archivo, sans-serif; font-size: 20px; font-weight: 600; margin: 0; letter-spacing: -.012em; }
+  .sec-head span { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; color: var(--ink-3); }
+  .finds { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; align-items: start; }
+  .find { background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 17px 18px 19px; }
+  .find .n { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--gate); margin: 0 0 8px; }
+  .find h3 { font-family: Archivo, sans-serif; font-size: 16.5px; font-weight: 600; margin: 0 0 8px; line-height: 1.28; letter-spacing: -.008em; }
+  .find p { margin: 0; font-size: 14px; color: var(--ink-2); }
+  .find p + p { margin-top: 9px; }
+  .find code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .86em; background: var(--inset); border-radius: 2px; padding: 1px 4px; }
+
+  table.scores { width: 100%; border-collapse: collapse; margin-top: 12px; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  table.scores th { text-align: right; font-weight: 500; color: var(--ink-3); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; padding: 0 0 5px; border-bottom: 1px solid var(--line); }
+  table.scores th:first-child { text-align: left; }
+  table.scores td { text-align: right; padding: 4px 0; border-bottom: 1px solid var(--line); color: var(--ink-2); }
+  table.scores td:first-child { text-align: left; color: var(--ink); }
+  table.scores tr:last-child td { border-bottom: 0; }
+  .up { color: var(--pass); font-weight: 600; }
+  .down { color: var(--fail); font-weight: 600; }
+
+  footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 10px 24px; justify-content: space-between; font-size: 12.5px; color: var(--ink-3); }
+  footer a { color: var(--ink-2); text-decoration: none; border-bottom: 1px solid var(--line-2); }
+  footer a:hover { color: var(--accent); border-color: var(--accent); }
+  .hint { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; }
+  kbd { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10.5px; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; color: var(--ink-2); background: var(--surface); }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">MLOps &middot; LLMOps &middot; Azure</p>
+      <h1>Gate by Gate</h1>
+      <p class="deck">Three pipelines in this repo. They all have the same shape on purpose &mdash; produce candidates, score them, and let a threshold decide what gets through.</p>
+    </div>
+    <a class="repo" href="https://github.com/rubak714/azure-mlops-llmops-platform">rubak714/azure-mlops-llmops-platform &#8599;</a>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><b>3</b><span>pipelines, one shape</span></div>
+    <div class="stat"><b>4</b><span>threshold gates</span></div>
+    <div class="stat"><b>173</b><span>tests, no network calls</span></div>
+    <div class="stat"><b>14</b><span>errors written up</span></div>
+    <div class="stat"><b>0</b><span>API keys needed</span></div>
+  </div>
+
+  <section class="stage">
+    <div class="stage-head">
+      <p class="stage-title">System map</p>
+      <div class="legend">
+        <span><i></i>script</span>
+        <span><i class="k-gate"></i>threshold gate</span>
+        <span><i class="k-store"></i>store / service</span>
+      </div>
+    </div>
+
+    <div class="scroller">
+      <figure style="margin:0">
+        <svg class="map" viewBox="0 0 1060 470" role="img"
+             aria-label="System map: GitHub Actions triggers three pipelines. The model pipeline runs train.py through an F1 threshold gate to register_model.py, the MLflow registry and serve.py. The prompt pipeline runs four prompt versions through render and escape, llm_client, prompt_metrics and a composite threshold gate. The checks lane runs check_injection through a boundary gate and detect_drift through a PSI gate. All three log to MLflow.">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <polygon class="mk" points="0,1 10,5 0,9"></polygon>
+            </marker>
+          </defs>
+
+          <!-- CI band -->
+          <g class="nb ci" id="n-ci" tabindex="0" role="button" aria-label="GitHub Actions">
+            <rect class="box" x="120" y="14" width="836" height="40" rx="3"></rect>
+            <text class="t-name" x="138" y="39">.github/workflows/</text>
+            <text class="t-sub" x="268" y="39">code-quality &middot; train-evaluate &middot; prompt-eval (gated) &middot; drift-check (Monday cron)</text>
+          </g>
+
+          <!-- trigger rail -->
+          <path class="wire" d="M120 34 H96 V404"></path>
+          <path class="wire" d="M96 140 H126" marker-end="url(#ar)"></path>
+          <path class="wire" d="M96 272 H126" marker-end="url(#ar)"></path>
+          <path class="wire" d="M96 404 H126" marker-end="url(#ar)"></path>
+
+          <!-- lane labels -->
+          <text class="t-lane" x="16" y="136">MODEL</text>
+          <text class="t-lane" x="16" y="268">PROMPT</text>
+          <text class="t-lane" x="16" y="400">CHECKS</text>
+
+          <!-- ============ LANE A : MODEL ============ -->
+          <g class="nb node" id="n-train" tabindex="0" role="button" aria-label="src/train.py">
+            <rect class="box" x="132" y="112" width="136" height="56" rx="3"></rect>
+            <text class="t-name" x="200" y="134" text-anchor="middle">train.py</text>
+            <text class="t-sub" x="200" y="151" text-anchor="middle">4 param combos</text>
+          </g>
+          <path class="wire" d="M268 140 H304" marker-end="url(#ar)"></path>
+          <text class="t-edge" x="286" y="132" text-anchor="middle">runs</text>
+
+          <g class="nb gate" id="g-f1" tabindex="0" role="button" aria-label="F1 threshold gate in evaluate.py">
+            <polygon class="box-gate" points="304,140 328,112 416,112 440,140 416,168 328,168"></polygon>
+            <text class="t-gate" x="372" y="134" text-anchor="middle">F1 &#8805; 0.85</text>
+            <text class="t-gate-sub" x="372" y="151" text-anchor="middle">evaluate.py</text>
+          </g>
+          <path class="wire" d="M440 140 H476" marker-end="url(#ar)"></path>
+          <text class="t-edge" x="458" y="132" text-anchor="middle">pass</text>
+
+          <g class="nb node" id="n-register" tabindex="0" role="button" aria-label="src/register_model.py">
+            <rect class="box" x="476" y="112" width="136" height="56" rx="3"></rect>
+            <text class="t-name" x="544" y="134" text-anchor="middle">register_model</text>
+            <text class="t-sub" x="544" y="151" text-anchor="middle">promotes best run</text>
+          </g>
+          <path class="wire" d="M612 140 H648" marker-end="url(#ar)"></path>
+
+          <g class="nb store" id="n-registry" tabindex="0" role="button" aria-label="MLflow model registry">
+            <rect class="box-store" x="648" y="112" width="136" height="56" rx="12"></rect>
+            <text class="t-store" x="716" y="134" text-anchor="middle">registry</text>
+            <text class="t-store-sub" x="716" y="151" text-anchor="middle">iris-classifier v2</text>
+          </g>
+          <path class="wire" d="M784 140 H820" marker-end="url(#ar)"></path>
+          <text class="t-edge" x="802" y="132" text-anchor="middle">models:/</text>
+
+          <g class="nb store" id="n-serve" tabindex="0" role="button" aria-label="src/serve.py FastAPI endpoint">
+            <rect class="box-store" x="820" y="112" width="136" height="56" rx="12"></rect>
+            <text class="t-store" x="888" y="134" text-anchor="middle">serve.py</text>
+            <text class="t-store-sub" x="888" y="151" text-anchor="middle">FastAPI :8000</text>
+          </g>
+
+          <!-- ============ LANE B : PROMPT ============ -->
+          <g class="nb node" id="n-prompts" tabindex="0" role="button" aria-label="Prompt registry, versions v1 to v4">
+            <rect class="box" x="132" y="244" width="136" height="56" rx="3"></rect>
+            <text class="t-name" x="200" y="266" text-anchor="middle">registry.json</text>
+            <text class="t-sub" x="200" y="283" text-anchor="middle">prompts v1 &ndash; v4</text>
+          </g>
+          <path class="wire" d="M268 272 H304" marker-end="url(#ar)"></path>
+
+          <g class="nb node" id="n-render" tabindex="0" role="button" aria-label="render_prompt escapes delimiters">
+            <rect class="box" x="304" y="244" width="136" height="56" rx="3"></rect>
+            <text class="t-name" x="372" y="266" text-anchor="middle">render_prompt</text>
+            <text class="t-sub" x="372" y="283" text-anchor="middle">escapes delimiters</text>
+          </g>
+          <path class="wire" d="M440 272 H476" marker-end="url(#ar)"></path>
+
+          <g class="nb node" id="n-client" tabindex="0" role="button" aria-label="llm_client provider abstraction">
+            <rect class="box" x="476" y="244" width="136" height="56" rx="3"></rect>
+            <text class="t-name" x="544" y="266" text-anchor="middle">llm_client.py</text>
+            <text class="t-sub" x="544" y="283" text-anchor="middle">stub | azure</text>
+          </g>
+          <path class="wire" d="M612 272 H648" marker-end="url(#ar)"></path>
+          <text class="t-edge" x="630" y="264" text-anchor="middle">text</text>
+
+          <g class="nb node" id="n-metrics" tabindex="0" role="button" aria-label="prompt_metrics, four measures">
+            <rect class="box" x="648" y="244" width="136" height="56" rx="3"></rect>
+            <text class="t-name" x="716" y="266" text-anchor="middle">prompt_metrics</text>
+            <text class="t-sub" x="716" y="283" text-anchor="middle">4 measures</text>
+          </g>
+          <path class="wire" d="M784 272 H820" marker-end="url(#ar)"></path>
+
+          <g class="nb gate" id="g-composite" tabindex="0" role="button" aria-label="Composite threshold gate for prompts">
+            <polygon class="box-gate" points="820,272 844,244 932,244 956,272 932,300 844,300"></polygon>
+            <text class="t-gate" x="888" y="266" text-anchor="middle">&#8805; 0.70</text>
+            <text class="t-gate-sub" x="888" y="283" text-anchor="middle">composite</text>
+          </g>
+
+          <!-- ============ LANE C : CHECKS ============ -->
+          <g class="nb node" id="n-injection" tabindex="0" role="button" aria-label="check_injection boundary test">
+            <rect class="box" x="132" y="376" width="136" height="56" rx="3"></rect>
+            <text class="t-name" x="200" y="398" text-anchor="middle">check_injection</text>
+            <text class="t-sub" x="200" y="415" text-anchor="middle">6 hostile inputs</text>
+          </g>
+          <path class="wire" d="M268 404 H304" marker-end="url(#ar)"></path>
+
+          <g class="nb gate" id="g-boundary" tabindex="0" role="button" aria-label="Boundary integrity gate">
+            <polygon class="box-gate" points="304,404 328,376 416,376 440,404 416,432 328,432"></polygon>
+            <text class="t-gate" x="372" y="398" text-anchor="middle">boundary</text>
+            <text class="t-gate-sub" x="372" y="415" text-anchor="middle">must be 100%</text>
+          </g>
+
+          <g class="nb node" id="n-drift" tabindex="0" role="button" aria-label="detect_drift using PSI and KS">
+            <rect class="box" x="648" y="376" width="136" height="56" rx="3"></rect>
+            <text class="t-name" x="716" y="398" text-anchor="middle">detect_drift</text>
+            <text class="t-sub" x="716" y="415" text-anchor="middle">PSI + KS per feature</text>
+          </g>
+          <path class="wire" d="M784 404 H820" marker-end="url(#ar)"></path>
+
+          <g class="nb gate" id="g-drift" tabindex="0" role="button" aria-label="Drift threshold gate">
+            <polygon class="box-gate" points="820,404 844,376 932,376 956,404 932,432 844,432"></polygon>
+            <text class="t-gate" x="888" y="398" text-anchor="middle">PSI &lt; 0.25</text>
+            <text class="t-gate-sub" x="888" y="415" text-anchor="middle">per feature</text>
+          </g>
+
+          <!-- ============ MLflow spine ============ -->
+          <path class="wire-soft" d="M956 140 H988" marker-end="url(#ar)"></path>
+          <path class="wire-soft" d="M956 272 H988" marker-end="url(#ar)"></path>
+          <path class="wire-soft" d="M956 404 H988" marker-end="url(#ar)"></path>
+
+          <g class="nb store" id="n-mlflow" tabindex="0" role="button" aria-label="MLflow tracking store">
+            <rect class="box-store" x="988" y="112" width="56" height="320" rx="12"></rect>
+            <text class="t-store" x="1016" y="272" text-anchor="middle" transform="rotate(-90 1016 272)">MLflow</text>
+          </g>
+        </svg>
+        <figcaption style="font-size:12px;color:var(--ink-3);margin-top:10px;max-width:72ch">
+          Every lane ends at a threshold and every lane logs to MLflow. The gate is the only place a decision gets made &mdash; everything before it just produces evidence.
+        </figcaption>
+      </figure>
+    </div>
+
+    <div class="console">
+      <div class="bar">
+        <button class="btn btn-go" id="go" type="button">Walk me through it</button>
+        <button class="btn" id="prev" type="button" disabled>&larr; Back</button>
+        <button class="btn" id="next" type="button">Next &rarr;</button>
+        <span class="counter" id="count">00 / 15</span>
+        <div class="ticks" id="ticks" role="tablist" aria-label="Walkthrough steps"></div>
+      </div>
+
+      <div class="panel">
+        <div class="say" id="say" aria-live="polite"></div>
+        <aside class="aside">
+          <h3>In the repo</h3>
+          <ul class="files" id="files"></ul>
+          <div class="runline" id="run"></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section class="findings">
+    <div class="sec-head">
+      <h2>Three things the measurements said that I did not expect</h2>
+      <span>written up as errors 11, 12 &amp; 13</span>
+    </div>
+    <div class="finds">
+
+      <article class="find">
+        <p class="n">Error 11</p>
+        <h3>One metric ranked the worst prompt first</h3>
+        <p>v1 scores <strong>highest</strong> on ROUGE-L, and it is the only version that invents a closing sentence and ignores the length limit. It writes four sentences where the others write two, and more text means more overlap with the reference. ROUGE rewarded it for rambling.</p>
+        <table class="scores">
+          <thead><tr><th>Version</th><th>ROUGE-L</th><th>Composite</th></tr></thead>
+          <tbody>
+            <tr><td>v1</td><td class="down">0.582</td><td>0.449</td></tr>
+            <tr><td>v2</td><td>0.498</td><td>0.650</td></tr>
+            <tr><td>v3</td><td>0.563</td><td class="up">0.825</td></tr>
+            <tr><td>v4</td><td>0.563</td><td class="up">0.825</td></tr>
+          </tbody>
+        </table>
+        <p>The weights were set before the comparison ran. This is why the gate uses a composite of four measures and not one number.</p>
+      </article>
+
+      <article class="find">
+        <p class="n">Error 13</p>
+        <h3>The prompts were throwing away half the input</h3>
+        <p>Text containing <code>Summary:</code> silently truncated the input for v1 and v2. The output was a fluent, correct-looking summary of the surviving half, with nothing anywhere saying the rest had gone. No attacker needed &mdash; minutes and email threads contain that word routinely.</p>
+        <p>Adding <code>&lt;text&gt;</code> tags in v3 did not fix it. It swapped the trigger to <code>&lt;/text&gt;</code>.</p>
+      </article>
+
+      <article class="find">
+        <p class="n">The fix, and its limit</p>
+        <h3>Delimiters do not prevent injection &mdash; they make it preventable</h3>
+        <p>This is SQL injection. User text concatenated into a structured string, with nothing checking whether the text contains the structure. So it takes the same fix: escape where data meets structure. <code>render_prompt</code> now does, and v3 and v4 went from 67% to <strong>100%</strong>.</p>
+        <p>v1 and v2 cannot be fixed this way. Their structure is the word <code>Summary:</code>, which is ordinary English &mdash; escaping it would corrupt any document that legitimately contains it.</p>
+      </article>
+
+    </div>
+  </section>
+
+  <footer>
+    <span>Built on Iris and eight hand-written texts, so every pipeline runs offline, free, and deterministically.</span>
+    <span class="hint">Step with <kbd>&larr;</kbd> <kbd>&rarr;</kbd> &middot; <a href="https://github.com/rubak714/azure-mlops-llmops-platform">read the repo</a></span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var STEPS = [
+    {
+      ch: "Start here", t: "Three pipelines, one shape",
+      hot: ["g-f1", "g-composite", "g-boundary", "g-drift"], dim: false,
+      html: "<p>A model, a set of prompts, and two monitoring checks. They look like different problems and they are built as the same one: <strong>produce candidates, score them, then let a threshold decide what gets through.</strong></p><p>The four amber shapes are the gates. They are the only places in the whole system where a decision happens &mdash; everything else just produces the evidence a gate reads.</p>",
+      files: ["4 gates across 3 pipelines"], run: "<b>$</b> make help"
+    },
+    {
+      ch: "Model pipeline &middot; 1 of 4", t: "Train four models, not one",
+      hot: ["n-train"],
+      html: "<p><code>train.py</code> fits a RandomForest on Iris across four parameter combinations and logs every one to MLflow &mdash; parameters, accuracy, F1, and the model artifact.</p><p>The fourth combination is <strong>deliberately crippled</strong> (<code>n_estimators=2</code>, <code>max_depth=1</code>). Without it every run passed and the gate downstream was never exercised. A pipeline that only ever succeeds does not prove its gate works.</p>",
+      files: ["src/train.py", "tests/test_data_loading.py"], run: "<b>$</b> make train"
+    },
+    {
+      ch: "Model pipeline &middot; 2 of 4", t: "The first gate: F1 &#8805; 0.85",
+      hot: ["g-f1"],
+      html: "<p><code>evaluate.py</code> reads back every run, picks the best by F1, and checks it against the threshold. It trains nothing. Selection and training are separate on purpose.</p><p>The comparison is <code>&gt;=</code>, not <code>&gt;</code> &mdash; a model landing exactly on 0.85 passes. That was wrong once, and the boundary test at exactly 0.85 is what caught it. A test at 0.95 would not have.</p>",
+      files: ["src/evaluate.py", "tests/test_evaluate.py"], run: "<b>$</b> make evaluate\n  Result: PASSED"
+    },
+    {
+      ch: "Model pipeline &middot; 3 of 4", t: "Only what passes gets registered",
+      hot: ["n-register", "n-registry"],
+      html: "<p><code>register_model.py</code> re-runs the same threshold check and promotes the winning run into the MLflow model registry. If nothing clears 0.85 it exits without registering anything.</p><p>The registry is the handoff point: everything upstream is experiments, everything downstream reads one promoted version.</p>",
+      files: ["src/register_model.py"], run: "<b>$</b> make register\n  iris-classifier v2"
+    },
+    {
+      ch: "Model pipeline &middot; 4 of 4", t: "Something finally consumes the model",
+      hot: ["n-serve"],
+      html: "<p>A FastAPI endpoint loads whatever was promoted and answers prediction requests. Before this existed the pipeline ended with a model in storage, which is not a deployment.</p><p>Two details worth knowing: an empty registry returns <strong>503, not 500</strong>, with a message naming the commands that fix it &mdash; nothing is broken, there is just nothing promoted yet. And <code>latest</code> is resolved to a real version number, because <code>latest</code> is a deprecated stage alias and tells you nothing a week later.</p>",
+      files: ["src/serve.py", "tests/test_serve.py"], run: "<b>$</b> make serve\n  POST /predict &#8594; setosa"
+    },
+    {
+      ch: "Prompt pipeline &middot; 1 of 5", t: "Prompts are versioned like models",
+      hot: ["n-prompts"],
+      html: "<p>Four prompt versions, from bare zero-shot to a full output contract, each recorded in <code>registry.json</code> with its technique and what changed.</p><p>This is the idea that took longest to accept: a prompt is a text file, so it feels like configuration. But editing one changes behaviour exactly the way retraining does &mdash; which makes an untracked prompt change the same problem MLflow exists to solve.</p>",
+      files: ["llm_experiments/registry.json", "prompt_v1 &hellip; prompt_v4.txt", "src/prompt_registry.py"], run: "<b>$</b> make prompts"
+    },
+    {
+      ch: "Prompt pipeline &middot; 2 of 5", t: "Where the input gets escaped",
+      hot: ["n-render"],
+      html: "<p><code>render_prompt</code> substitutes the input text into a template &mdash; and escapes the delimiter out of it first, so a pasted <code>&lt;/text&gt;</code> arrives as inert characters instead of closing the prompt early.</p><p>One line, and it is the whole defence. It is here rather than in each caller so the fix applies everywhere a prompt is built, not everywhere someone remembered to call it.</p>",
+      files: ["src/prompt_registry.py", "escape_for_prompt()"], run: "&lt;/text&gt;  &#8594;  &amp;lt;/text&amp;gt;"
+    },
+    {
+      ch: "Prompt pipeline &middot; 3 of 5", t: "One place that talks to a model",
+      hot: ["n-client"],
+      html: "<p>Everything downstream calls <code>complete()</code> and does not care what answers. The default is a <strong>deterministic offline stub</strong>, so this entire pipeline runs in CI with no API key and no bill. Set the <code>AZURE_OPENAI_*</code> variables and it switches to a real deployment by itself.</p><p>The stub is not a language model. It reads the constraints out of a prompt, obeys them, and deliberately misbehaves when the prompt does not forbid it &mdash; inventing a closing sentence, opening with a preamble. That is said on the README front page, not buried.</p>",
+      files: ["src/llm_client.py", "tests/test_llm_client.py"], run: "provider: stub:extractive-simulator"
+    },
+    {
+      ch: "Prompt pipeline &middot; 4 of 5", t: "Four questions instead of one score",
+      hot: ["n-metrics"],
+      html: "<p>Scoring text has no single right answer, so &ldquo;is this good&rdquo; is split into four narrower questions that each do: does it overlap a reference summary, is every word actually in the source, did it respect the length limit, did it obey the output format.</p><p>ROUGE-L and the subsequence algorithm underneath it are written out by hand rather than imported &mdash; worth knowing what a metric computes before trusting it.</p>",
+      files: ["src/prompt_metrics.py", "tests/test_prompt_metrics.py"], run: "rouge_l &middot; grounding &middot; length &middot; format"
+    },
+    {
+      ch: "Prompt pipeline &middot; 5 of 5", t: "The second gate: composite &#8805; 0.70",
+      hot: ["g-composite"],
+      html: "<p>Each version runs over all eight evaluation texts and is logged as its own MLflow run, with the prompt text kept as the artifact. Best composite wins, and has to clear 0.70.</p><p>The threshold is lower than the model's 0.85 and that is not a lowered bar. A summary scoring 1.0 would have reproduced my reference wording exactly, which is not the goal. Obedience alone already scores 0.60, so the gate sits above that to require real overlap too.</p>",
+      files: ["src/evaluate_prompts.py"], run: "<b>$</b> make prompt-eval\n  v3  0.825  PASSED"
+    },
+    {
+      ch: "Finding", t: "ROUGE-L alone ranked the worst prompt first",
+      hot: ["n-metrics", "g-composite"], flag: "Error 11",
+      html: "<p>v1 scores <strong>0.582</strong> on ROUGE-L &mdash; higher than every other version &mdash; while being the only one that invents a sentence and ignores the length limit. More text means more overlap, so the metric rewarded it for rambling.</p><p>Two of the four versions fail the gate honestly, with no crippling needed. On the model side a run had to be deliberately broken to make the gate fire.</p>",
+      files: ["docs/errors_and_fixes.md &sect;11"], run: "v1 rouge 0.582  &#8594;  composite 0.449"
+    },
+    {
+      ch: "Checks &middot; 1 of 2", t: "Does the prompt keep instructions and data apart?",
+      hot: ["n-injection", "g-boundary"], flag: "Error 13",
+      html: "<p>Six hostile inputs, each a thing someone could legitimately paste into a summarizer. The question is whether the whole document survives into what gets summarized.</p><p>It did not. Text containing <code>Summary:</code> cut v1 and v2's input in half &mdash; and the output was a fluent summary of the surviving half with nothing indicating the rest was gone. Adding <code>&lt;text&gt;</code> tags swapped the trigger rather than removing it.</p><p>After escaping, v3 and v4 hold on every case. v1 and v2 cannot be fixed: their structure is ordinary English.</p>",
+      files: ["src/check_injection.py", "llm_experiments/injection_tests.json"], run: "v3 clean &middot; v4 clean &middot; v1 83% &middot; v2 83%"
+    },
+    {
+      ch: "Checks &middot; 2 of 2", t: "Does the data still look like the training data?",
+      hot: ["n-drift", "g-drift"],
+      html: "<p>The model pipeline says whether a model is good on the data it was trained on. Nothing said whether the data arriving now still resembles it &mdash; a model can hold a perfect F1 for a year while the live inputs drift away underneath.</p><p>PSI and the two-sample KS statistic, per feature, both written in numpy. Four scenarios, and the one that matters most is <strong>no-drift</strong>: a monitor that fires on unchanged data is worse than no monitor, because people learn to ignore it.</p>",
+      files: ["src/detect_drift.py", "tests/test_detect_drift.py"], run: "measurement-shift &#8594; petal length only"
+    },
+    {
+      ch: "Underneath", t: "Everything is recorded in one place",
+      hot: ["n-mlflow", "n-registry"],
+      html: "<p>Training runs, prompt versions, injection reports and drift scores all land in the same tracking store. Four experiments, one UI, and each run carries enough to reproduce it &mdash; the prompt text, the provider that answered, the exact thresholds.</p><p>Which is the point of the shared shape: a prompt version and a model version are inspected the same way because they were recorded the same way.</p>",
+      files: ["mlruns/ (gitignored)"], run: "<b>$</b> make mlflow &#8594; :5000"
+    },
+    {
+      ch: "Around it", t: "What runs without being asked",
+      hot: ["n-ci"],
+      html: "<p>Lint and tests on every PR. Training and evaluation on every merge. The prompt evaluation as a <strong>blocking gate</strong> when anything prompt-related changes &mdash; a prompt edit that regresses every version below 0.70 stops the merge the way a failing test does.</p><p>Drift runs on a Monday morning cron, because drift is the one thing here that changes without the code changing. Waiting for a commit would mean never checking during the quiet periods that matter most.</p>",
+      files: [".github/workflows/ &times;4", ".pre-commit-config.yaml", "Makefile"], run: "<b>$</b> make ci   &#8594;  173 passed"
+    }
+  ];
+
+  var say = document.getElementById("say"),
+      filesEl = document.getElementById("files"),
+      runEl = document.getElementById("run"),
+      prevB = document.getElementById("prev"),
+      nextB = document.getElementById("next"),
+      goB = document.getElementById("go"),
+      countEl = document.getElementById("count"),
+      ticksEl = document.getElementById("ticks"),
+      allNodes = Array.prototype.slice.call(document.querySelectorAll(".nb")),
+      i = 0;
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+  STEPS.forEach(function (s, idx) {
+    var b = document.createElement("button");
+    b.className = "tick";
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-label", "Step " + (idx + 1) + ": " + s.t.replace(/&[a-z]+;/g, ""));
+    b.addEventListener("click", function () { show(idx); });
+    ticksEl.appendChild(b);
+  });
+  var ticks = Array.prototype.slice.call(ticksEl.children);
+
+  function show(n) {
+    i = Math.max(0, Math.min(STEPS.length - 1, n));
+    var s = STEPS[i];
+
+    say.innerHTML =
+      '<p class="chapter">' + s.ch + "</p>" +
+      (s.flag ? '<span class="flag flag-find">' + s.flag + "</span>" : "") +
+      "<h2>" + s.t + "</h2>" + s.html;
+
+    filesEl.innerHTML = s.files.map(function (f) { return "<li>" + f + "</li>"; }).join("");
+    runEl.innerHTML = s.run;
+
+    var hot = s.hot || [];
+    var doDim = s.dim !== false;
+    allNodes.forEach(function (el) {
+      var on = hot.indexOf(el.id) !== -1;
+      el.classList.toggle("hot", on);
+      el.classList.toggle("dim", doDim && !on);
+    });
+
+    prevB.disabled = i === 0;
+    nextB.disabled = i === STEPS.length - 1;
+    countEl.textContent = pad(i + 1) + " / " + pad(STEPS.length);
+    ticks.forEach(function (t, idx) {
+      t.setAttribute("aria-current", idx === i ? "true" : "false");
+      t.classList.toggle("done", idx < i);
+    });
+  }
+
+  prevB.addEventListener("click", function () { show(i - 1); });
+  nextB.addEventListener("click", function () { show(i + 1); });
+  goB.addEventListener("click", function () {
+    show(0);
+    document.querySelector(".stage").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  allNodes.forEach(function (el) {
+    function jump() {
+      for (var k = 0; k < STEPS.length; k++) {
+        if ((STEPS[k].hot || []).indexOf(el.id) !== -1) { show(k); return; }
+      }
+    }
+    el.addEventListener("click", jump);
+    el.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); jump(); }
+    });
+  });
+
+  document.addEventListener("keydown", function (e) {
+    var tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea") return;
+    if (e.key === "ArrowRight") { e.preventDefault(); show(i + 1); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); show(i - 1); }
+  });
+
+  show(0);
+})();
+</script>
+
+</body>
+</html>
