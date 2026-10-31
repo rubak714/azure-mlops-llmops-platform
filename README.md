@@ -316,6 +316,10 @@ What it proves: the pipeline works end to end, and the metrics catch the failure
 
 The Azure OpenAI adapter is written and its configuration and failure paths are tested, but it has not been run against a provisioned deployment. Same cost reason the Databricks workspace from my previous repo was destroyed after verifying it worked.
 
+## 🔧 Note on tooling
+
+The prompt evaluation pipeline, the drift detection, and the documentation around them were built with Claude Code as an assistant. Every number quoted in this repo is real output from the code in it - the prompt scores come from `python -m src.evaluate_prompts` and the drift figures from `python -m src.detect_drift`, and the limitations recorded in `errors_and_fixes.md` are the ones I actually ran into rather than illustrative examples.
+
 ## 🔧 Related repo
 
 [azure-data-platform-terraform](https://github.com/rubak714/azure-data-platform-terraform) - the infrastructure layer this builds on. Covers Terraform modules for Databricks, ADLS Gen2, Key Vault, and VNet on Azure deployed to Germany West Central with a full GitHub Actions CI/CD pipeline.
